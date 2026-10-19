@@ -1,145 +1,141 @@
 """
-KiCad Recursive Project Scanner (scan_project.py)
-Crawls a directory tree for .kicad_sch files, extracts symbols and components,
-and registers them into the CircuitProof SQLite KnowledgeStore.
+KiCad project scanner (scan_project.py)
+
+Turns an existing .kicad_sch (made by a person, EasyEDA export, or another AI tool) into a
+CircuitProof Design, so the referee can audit designs CircuitProof did not create.
+
+Connectivity comes from KiCad's own netlist exporter (kicad-cli), so labels, power symbols,
+hierarchical sheets and buses are resolved exactly as KiCad resolves them.
 """
 
+import glob
+import json
 import os
+import shutil
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
-import sexpdata
-from knowledge_store import KnowledgeStore
 
-class KiCadProjectScanner:
-    def __init__(self, db_name="circuitproof_notebook.db"):
-        self.kb = KnowledgeStore(db_name)
+from design import Component, Design, Net, net_basename
+from generator import _child, _children, parse_sexpr
 
-    def scan_directory(self, root_dir):
-        root_path = Path(root_dir)
-        if not root_path.exists():
-            print(f"[Error]: Directory '{root_dir}' does not exist.")
-            return
 
-        print(f"[Scanner]: Recursively scanning '{root_path.resolve()}' for KiCad schematics...")
-        
-        # Find all .kicad_sch files recursively
-        sch_files = list(root_path.rglob("*.kicad_sch"))
-        
-        if not sch_files:
-            print("  -> No .kicad_sch files found in this directory tree.")
-            return
+class KiCadCliError(RuntimeError):
+    pass
 
-        total_components_found = 0
 
-        for sch_file in sch_files:
-            print(f"\n[Parsing File]: {sch_file.relative_to(root_path)}")
-            count = self._parse_schematic(sch_file)
-            total_components_found += count
+def find_kicad_cli():
+    candidates = [os.getenv("KICAD_CLI"), shutil.which("kicad-cli")]
+    candidates += sorted(glob.glob(r"C:\Program Files\KiCad\*\bin\kicad-cli.exe"), reverse=True)
+    candidates += ["/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"]
+    for c in candidates:
+        if c and os.path.isfile(c):
+            return c
+    raise KiCadCliError("kicad-cli not found. Install KiCad 8 or newer, or set KICAD_CLI to its path.")
 
-        print(f"\n==================================================")
-        print(f" Scan Complete! Total components cataloged: {total_components_found}")
-        print(f"==================================================")
 
-    def _parse_schematic(self, file_path):
+def _run(args):
+    try:
+        proc = subprocess.run(args, capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise KiCadCliError(f"Running kicad-cli failed: {e}") from e
+    return proc
+
+
+def export_netlist(sch_path):
+    cli = find_kicad_cli()
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, "netlist.net")
+        proc = _run([cli, "sch", "export", "netlist", "--format", "kicadsexpr", "--output", out, str(sch_path)])
+        if not os.path.isfile(out):
+            raise KiCadCliError(f"Netlist export failed: {(proc.stderr or proc.stdout).strip()}")
+        with open(out, encoding="utf-8") as f:
+            return f.read()
+
+
+def design_from_netlist(text):
+    tree = parse_sexpr(text)
+    components = []
+    comps_node = _child(tree, "components") or []
+    for comp in _children(comps_node, "comp"):
+        ref = str(_child(comp, "ref")[1])
+        if ref.startswith("#"):
+            continue
+        value = _child(comp, "value")
+        footprint = _child(comp, "footprint")
+        src = _child(comp, "libsource")
+        lib_id = ""
+        if src:
+            lib, part = _child(src, "lib"), _child(src, "part")
+            lib_id = f"{lib[1] if lib else ''}:{part[1] if part else ''}"
+        components.append(Component(reference=ref, lib_id=lib_id, value=str(value[1]) if value else "",
+                                    footprint=str(footprint[1]) if footprint else ""))
+
+    refs = {c.reference for c in components}
+    nets = []
+    for net in _children(_child(tree, "nets") or [], "net"):
+        name = net_basename(str(_child(net, "name")[1]))
+        conns = []
+        for node in _children(net, "node"):
+            ref = str(_child(node, "ref")[1])
+            if ref not in refs:
+                continue
+            func = _child(node, "pinfunction")
+            pin = str(func[1]) if func and str(func[1]) not in ("", "~") else str(_child(node, "pin")[1])
+            if [ref, pin] not in conns:
+                conns.append([ref, pin])
+        if conns:
+            nets.append(Net(net=name, connections=conns))
+    return Design(components=components, nets=nets)
+
+
+def scan_schematic(sch_path, store=None, project=None):
+    design = design_from_netlist(export_netlist(sch_path))
+    if store is not None:
+        for c in design.components:
+            store.record_observed(c.lib_id, c.value, project or Path(sch_path).stem)
+    return design
+
+
+def run_erc(sch_path):
+    """Run KiCad's own ERC. Returns {"errors": n, "warnings": n, "items": [...]} or None if unavailable."""
+    try:
+        cli = find_kicad_cli()
+    except KiCadCliError:
+        return None
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, "erc.json")
+        _run([cli, "sch", "erc", "--format", "json", "--severity-all", "--output", out, str(sch_path)])
+        if not os.path.isfile(out):
+            return None
+        with open(out, encoding="utf-8") as f:
+            report = json.load(f)
+    items = []
+    for sheet in report.get("sheets", []):
+        for v in sheet.get("violations", []):
+            items.append({"severity": v.get("severity", ""), "type": v.get("type", ""),
+                          "description": v.get("description", "")})
+    return {"errors": sum(1 for i in items if i["severity"] == "error"),
+            "warnings": sum(1 for i in items if i["severity"] == "warning"),
+            "items": items}
+
+
+def scan_directory(root_dir, store=None):
+    results = []
+    for sch in sorted(Path(root_dir).rglob("*.kicad_sch")):
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            sexp = sexpdata.loads(content)
-        except Exception as e:
-            print(f"  [Error parsing S-expression]: {e}")
-            return 0
+            results.append((sch, scan_schematic(sch, store, sch.parent.name), None))
+        except KiCadCliError as e:
+            results.append((sch, None, str(e)))
+    return results
 
-        components_count = 0
-
-        # Helper function to recursively search the S-expression tree for symbols
-        def walk_sexp(node):
-            nonlocal components_count
-            if isinstance(node, list) and len(node) > 0:
-                # Check if this list node represents a symbol instance: (symbol (lib_id ...) ...)
-                if node[0] == sexpdata.Symbol('symbol'):
-                    ref, lib_id, value = self._extract_symbol_metadata(node)
-                    if ref:
-                        # Categorize component type based on reference prefix or value
-                        category = self._infer_category(ref, lib_id, value)
-                        
-                        # Default electrical facts if not explicitly mapped
-                        facts = self._get_default_facts_for_component(ref, lib_id, value)
-                        
-                        # Save into SQLite KnowledgeStore
-                        self.kb.save_component(component_id=ref, category=category, facts_dict=facts, verified=1)
-                        print(f"    -> Extracted Component: [{ref}] (Lib: {lib_id}, Cat: {category})")
-                        components_count += 1
-                        return  # Don't recurse deeper into this symbol instance block
-
-                # Recurse through all child nodes
-                for item in node:
-                    walk_sexp(item)
-
-        walk_sexp(sexp)
-        return components_count
-
-    def _extract_symbol_metadata(self, symbol_node):
-        ref = None
-        lib_id = None
-        value = None
-
-        # The second element in a symbol node is often the lib_id symbol string
-        if len(symbol_node) > 1 and isinstance(symbol_node[1], sexpdata.Symbol):
-            lib_id = symbol_node[1].value()
-        elif len(symbol_node) > 1 and isinstance(symbol_node[1], str):
-            lib_id = symbol_node[1]
-
-        # Scan properties inside the symbol node
-        for item in symbol_node:
-            if isinstance(item, list) and len(item) > 0 and item[0] == sexpdata.Symbol('property'):
-                if len(item) > 2 and isinstance(item[1], str) and isinstance(item[2], str):
-                    prop_name = item[1]
-                    prop_val = item[2]
-                    if prop_name == "Reference":
-                        ref = prop_val
-                    elif prop_name == "Value":
-                        value = prop_val
-
-        return ref, lib_id, value
-
-    def _infer_category(self, ref, lib_id, value):
-        prefix = ''.join([c for c in ref if c.isalpha()]).upper()
-        if prefix == 'U':
-            if lib_id and ('MCU' in lib_id.upper() or 'STM32' in lib_id.upper() or 'ATMEGA' in lib_id.upper()):
-                return 'MCU'
-            return 'IC / Module'
-        elif prefix == 'R':
-            return 'Resistor'
-        elif prefix == 'C':
-            return 'Capacitor'
-        elif prefix == 'J' or prefix == 'P':
-            return 'Connector'
-        return 'Passive / Other'
-
-    def _get_default_facts_for_component(self, ref, lib_id, value):
-        # Assign default electrical specs for rule checks if it matches known parts
-        upper_lib = (lib_id or "").upper()
-        if 'STM32' in upper_lib:
-            return {"voh_min": 2.4, "vih_min": 2.0, "max_spi_hz": 18000000}
-        elif 'BNO' in upper_lib or 'SENSOR' in upper_lib:
-            return {"voh_min": 2.4, "vih_min": 1.4, "max_spi_hz": 3000000}
-        elif 'FLASH' in upper_lib or 'W25' in upper_lib:
-            return {"voh_min": 2.4, "vih_min": 2.0, "max_spi_hz": 104000000}
-        
-        # Generic safe defaults
-        return {"voh_min": 2.4, "vih_min": 1.5, "max_spi_hz": 10000000}
-
-    def close(self):
-        self.kb.close()
 
 if __name__ == "__main__":
-    # Test scan on current working directory or specify your KiCad project folder path
-    target_folder = input("Enter path to KiCad project directory (press Enter for current folder): ").strip()
-    if not target_folder:
-        target_folder = "."
-
-    scanner = KiCadProjectScanner()
-    try:
-        scanner.scan_directory(target_folder)
-    finally:
-        scanner.close()
+    from knowledge_store import KnowledgeStore
+    target = sys.argv[1] if len(sys.argv) > 1 else "."
+    for path, design, err in scan_directory(target, KnowledgeStore()):
+        if err:
+            print(f"[FAIL] {path}: {err}")
+        else:
+            print(f"[OK]   {path}: {len(design.components)} components, {len(design.nets)} nets")

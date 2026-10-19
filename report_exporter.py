@@ -1,57 +1,67 @@
 """
-CircuitProof Engineering Report Exporter (report_exporter.py)
-Generates a structured Markdown or JSON audit report for hackathon submission.
+Audit report exporter (report_exporter.py)
+
+Builds the Markdown report from referee findings. Every row states exactly what was checked;
+nothing is reported as verified unless a rule actually checked it.
 """
 
 import os
 from datetime import datetime
 
+from circuitproof_core import FAIL, PASS, UNVERIFIED, WARN, summarize
+
+ICONS = {FAIL: "❌ FAIL", WARN: "⚠️ WARN", UNVERIFIED: "❔ UNVERIFIED", PASS: "✅ PASS"}
+
+
+def _cell(text):
+    return str(text).replace("|", "\\|").replace("\n", " ")
+
+
 class ReportExporter:
     def __init__(self, output_dir="."):
         self.output_dir = output_dir
 
-    def generate_audit_report(self, project_name, audit_results, ai_summary):
-        filename = f"{project_name}_audit_report.md"
-        file_path = os.path.join(self.output_dir, filename)
-        
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    def generate(self, project_name, findings, *, kind="audit", design=None, history=None,
+                 erc=None, engine=None, files=None):
+        summary = summarize(findings)
+        path = os.path.join(self.output_dir, f"{project_name}_audit_report.md")
+        L = [f"# CircuitProof Audit Report: {project_name}", "",
+             f"**Generated:** {datetime.now():%Y-%m-%d %H:%M:%S}  ",
+             f"**Mode:** {'Generated from prompt' if kind == 'generation' else 'Audit of existing schematic'}  "]
+        if engine:
+            where = "local" if engine.get("runs_locally") else "remote"
+            L.append(f"**Planner model:** {engine.get('model')} via {engine.get('provider')} ({where})  ")
+        L += ["**Checker:** CircuitProof deterministic referee", "",
+              f"## Verdict: {summary['verdict']}", "",
+              " · ".join(f"{ICONS[s]}: {n}" for s, n in summary["counts"].items()), ""]
 
-        report_content = f"""# CircuitProof Engineering Audit Report
-**Project Name:** {project_name}  
-**Generated On:** {timestamp}  
-**Engine:** NVIDIA Nemotron via Nebius Token Factory + Deterministic Referee  
+        L += ["## Findings", "", "| Status | Rule | Finding | Fix | Data |", "| --- | --- | --- | --- | --- |"]
+        for f in findings:
+            data = {True: "datasheet-verified", False: "seed data, not yet verified", None: "—"}[f.data_verified]
+            L.append(f"| {ICONS[f.status]} | {_cell(f.rule)} | {_cell(f.message)} | {_cell(f.fix or '—')} | {data} |")
+        if not findings:
+            L.append("| — | — | No rules applied to this design | — | — |")
 
----
+        if history:
+            L += ["", "## Generate → verify → repair history", "", "| Round | Result | Problems sent back |",
+                  "| --- | --- | --- |"]
+            for h in history:
+                probs = h["schema_errors"] + h["violations"]
+                L.append(f"| {h['round']} | {h['status']} | {_cell('; '.join(probs) or 'none')} |")
 
-## 1. Executive Summary
-This design was automatically scanned, rule-checked, and synthesized using the **CircuitProof Agentic Hardware Pipeline**.
+        if erc is not None:
+            L += ["", "## KiCad ERC (kicad-cli)", "", f"Errors: {erc['errors']} · Warnings: {erc['warnings']}", ""]
+            for item in erc["items"][:30]:
+                L.append(f"- **{item['severity']}** {_cell(item['type'])}: {_cell(item['description'])}")
 
-**AI Design Assessment:**
-> {ai_summary}
+        if design is not None:
+            L += ["", "## Components", "", "| Ref | Symbol | Value |", "| --- | --- | --- |"]
+            for c in design.components:
+                L.append(f"| {c.reference} | {_cell(c.lib_id)} | {_cell(c.value or '—')} |")
 
----
+        if files:
+            L += ["", "## Files", ""] + [f"- `{f}`" for f in files]
 
-## 2. Deterministic Rule Verification Results
-| Protocol / Check | Target Components | Status | Details / Metrics |
-| :--- | :--- | :--- | :--- |
-"""
-
-        for audit in audit_results:
-            status_badge = "✅ PASS" if audit.get("passed", False) else "❌ FAIL"
-            report_content += f"| {audit.get('protocol', 'General')} | {audit.get('mcu', 'N/A')} -> {audit.get('receiver', audit.get('peripheral', 'N/A'))} | {status_badge} | VOH/VIH or Clock match verified | \n"
-
-        report_content += f"""
----
-
-## 3. Artifacts Generated
-- **Schematic File:** `{project_name}.kicad_sch` (Fully wired S-expression with net labels)
-- **Database Index:** Cataloged in SQLite KnowledgeStore
-
-*Report compiled automatically by CircuitProof Agent.*
-"""
-
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(report_content)
-
-        print(f"[Report Exporter]: Report successfully generated at {file_path}")
-        return file_path
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(L) + "\n")
+        return path
