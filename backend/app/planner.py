@@ -439,6 +439,10 @@ class DesignPlanner:
                         notes.append(f"Net '{n.get('net')}': '{pair[0]}' replaced by its reference '{match[0]}'")
                         pair[0] = match[0]
 
+        notes += self._oled_module_as_header(data)
+        notes += self._plain_status_leds(data)
+        refs = {str(c.get("reference")) for c in data["components"] if isinstance(c, dict)}  # may have renamed parts
+
         # Generic power pin names the symbol doesn't have ("GND" on an STM32 whose pins are VSS, "3V3" on an
         # ESP32 module whose pin is VDD): use the symbol's own ground / supply pin.
         lib_of = {str(c.get("reference")): str(c.get("lib_id", "")) for c in data["components"] if isinstance(c, dict)}
@@ -500,6 +504,113 @@ class DesignPlanner:
                         seen.add(key)
                         unique.append(pair)
                 n["connections"] = unique
+        return notes
+
+    def _oled_module_as_header(self, data):
+        """KiCad's only SSD1306 symbol (Display_Graphic:OLED-128O064D) is the bare 30-pin glass panel, which
+        needs charge-pump capacitors, mode straps and more; models wire it wrongly (SCL on a charge-pump pin).
+        What hobby boards actually use is the 4-pin I2C OLED module, drawn as a 4-pin header. Swap the panel
+        for that header (1 GND, 2 VCC, 3 SCL, 4 SDA) and wire each pin by what its net is."""
+        notes = []
+        if not self.synth.lib.has("Connector_Generic:Conn_01x04"):
+            return notes
+        comps = [c for c in data["components"] if isinstance(c, dict)]
+        nets = [n for n in data.get("nets") or [] if isinstance(n, dict)]
+        rails = data.get("rails") if isinstance(data.get("rails"), dict) else None
+        refs = {str(c.get("reference")) for c in comps}
+        for c in comps:
+            if not re.search(r"Display_Graphic:OLED-128O064D", str(c.get("lib_id", ""))):
+                continue
+            old = str(c.get("reference"))
+            touched = [n for n in nets if any(isinstance(p, list) and len(p) == 2 and str(p[0]) == old
+                                              for p in n.get("connections") or [])]
+            uses_i2c = any(re.search(r"SCL|SDA|I2C|SCK|SDI", str(n.get("net")), re.I) for n in touched) or any(
+                str(p[1]).upper() in ("SCL", "SDA", "D0", "D1", "D2") for n in touched for p in n.get("connections") or []
+                if isinstance(p, list) and len(p) == 2 and str(p[0]) == old)
+            if not uses_i2c:
+                continue  # an SPI/parallel panel design: leave it to the normal checks
+            i = 1
+            while f"J{i}" in refs:
+                i += 1
+            new = f"J{i}"
+            refs.add(new)
+            c.update({"reference": new, "lib_id": "Connector_Generic:Conn_01x04",
+                      "value": "SSD1306 OLED module (1 GND, 2 VCC, 3 SCL, 4 SDA)"})
+            for bus in data.get("buses") or []:  # a header is not a bus device with a clock limit
+                if isinstance(bus, dict) and isinstance(bus.get("devices"), list):
+                    bus["devices"] = [x for x in bus["devices"] if str(x) != old]
+            if isinstance(data.get("buses"), list):  # a bus left with no devices has nothing to check
+                data["buses"] = [b for b in data["buses"] if not (isinstance(b, dict) and b.get("devices") == [])]
+            role_net = {}
+            for n in touched:
+                name = str(n.get("net"))
+                pins = [str(p[1]).upper() for p in n.get("connections") or []
+                        if isinstance(p, list) and len(p) == 2 and str(p[0]) == old]
+                n["connections"] = [p for p in n.get("connections") or []
+                                    if not (isinstance(p, list) and len(p) == 2 and str(p[0]) == old)]
+                v = rail_voltage(name, rails)
+                if is_ground_net(name) or (v == 0):
+                    role = "1"
+                elif v and v > 0:
+                    role = "2"
+                elif re.search(r"SCL|SCK|CLK", name, re.I) or "D0" in pins or "SCL" in pins:
+                    role = "3"
+                elif re.search(r"SDA|SDI|DATA", name, re.I) or {"D1", "D2", "SDA"} & set(pins):
+                    role = "4"
+                else:
+                    continue
+                if role not in role_net or (role == "2" and abs((v or 0) - 3.3) < abs(
+                        (rail_voltage(str(role_net[role].get("net")), rails) or 0) - 3.3)):
+                    role_net[role] = n
+            for role, n in role_net.items():
+                n["connections"].append([new, role])
+            # supply and ground even if the model only wired the bus
+            if "1" not in role_net:
+                gnd = next((n for n in nets if is_ground_net(str(n.get("net")))), None)
+                if gnd is not None:
+                    gnd["connections"].append([new, "1"])
+            if "2" not in role_net:
+                positive = sorted(((rail_voltage(str(n.get("net")), rails) or 0), id(n), n) for n in nets
+                                  if (rail_voltage(str(n.get("net")), rails) or 0) > 0)
+                fit = next((n for v, _, n in positive if abs(v - 3.3) < 0.01), positive[0][2] if positive else None)
+                if fit is not None:
+                    fit["connections"].append([new, "2"])
+            notes.append(f"{old} (bare SSD1306 OLED panel) replaced by {new}, a 4-pin I2C OLED module header "
+                         f"(GND, VCC, SCL, SDA)")
+        return notes
+
+    def _plain_status_leds(self, data):
+        """A multi-colour LED (RGB, several cathodes) picked for an ordinary status LED: use a plain LED, with
+        the anode kept and every cathode connection turned into the one cathode. Not done when RGB was asked."""
+        notes = []
+        if re.search(r"\bRGB\b|multi.?colou?r|bi.?colou?r", getattr(self, "_prompt", "") or "", re.I):
+            return notes
+        if not self.synth.lib.has("Device:LED"):
+            return notes
+        for c in [c for c in data["components"] if isinstance(c, dict)]:
+            lib = str(c.get("lib_id", ""))
+            if not re.match(r"^Device:LED_(?!Small$|Filled$|Pad$)\w*(RGB|BGR|RG|GB|RB|ABGR|ARGB|RGBA)\w*$", lib, re.I):
+                continue
+            ref = str(c.get("reference"))
+            c["lib_id"] = "Device:LED"
+            seen_k = set()
+            for n in data.get("nets") or []:
+                if not isinstance(n, dict):
+                    continue
+                kept = []
+                for p in n.get("connections") or []:
+                    if isinstance(p, list) and len(p) == 2 and str(p[0]) == ref:
+                        pin = str(p[1]).upper()
+                        if pin in ("A", "COM", "COMMON") or pin.startswith("A"):
+                            p = [ref, "A"]
+                        else:
+                            if seen_k:  # one cathode: keep the first cathode connection only
+                                continue
+                            seen_k.add(n.get("net"))
+                            p = [ref, "K"]
+                    kept.append(p)
+                n["connections"] = kept
+            notes.append(f"{ref}: multi-colour LED ({lib}) replaced by a plain status LED (Device:LED)")
         return notes
 
     def _move_indicator_pins(self, data, lib_of):
@@ -1357,7 +1468,8 @@ class DesignPlanner:
                 need = 0
                 for ref, pin in net.connections:
                     comp = design.component(ref)
-                    if comp is None or not (ref[:1].upper() == "U" and SUPPLY_PIN.match(pin)):
+                    # any chip counts, whatever its reference ("BME280", "OLED"), as the referee counts it
+                    if comp is None or ref_prefix(ref) in PASSIVE_PREFIXES or not SUPPLY_PIN.match(pin):
                         continue
                     need += len({p["number"] for p in self.synth.lib.get(comp.lib_id)["pins"]
                                  if pin in (p["number"], p["name"])}) or 1
