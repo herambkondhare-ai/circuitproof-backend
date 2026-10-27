@@ -1,0 +1,134 @@
+{
+  "project_name": "demo_good",
+  "design": {
+    "components": [
+      {
+        "reference": "U1",
+        "lib_id": "MCU_ST_STM32F1:STM32F103C8Tx",
+        "value": "STM32F103C8T6",
+        "block": "mcu"
+      },
+      {
+        "reference": "U2",
+        "lib_id": "Sensor:BNO085",
+        "value": "BNO085",
+        "part_id": "BNO085",
+        "block": "peripheral"
+      },
+      {
+        "reference": "R1",
+        "lib_id": "Device:R",
+        "value": "4.7k",
+        "block": "peripheral"
+      },
+      {
+        "reference": "R2",
+        "lib_id": "Device:R",
+        "value": "4.7k",
+        "block": "peripheral"
+      },
+      {
+        "reference": "C1",
+        "lib_id": "Device:C",
+        "value": "100nF",
+        "block": "mcu"
+      },
+      {
+        "reference": "C2",
+        "lib_id": "Device:C",
+        "value": "100nF",
+        "block": "peripheral"
+      }
+    ],
+    "nets": [
+      {
+        "net": "+3V3",
+        "connections": [
+          [
+            "U1",
+            "VDD"
+          ],
+          [
+            "U2",
+            "VDD"
+          ],
+          [
+            "R1",
+            "1"
+          ],
+          [
+            "R2",
+            "1"
+          ],
+          [
+            "C1",
+            "1"
+          ],
+          [
+            "C2",
+            "1"
+          ]
+        ]
+      },
+      {
+        "net": "GND",
+        "connections": [
+          [
+            "U1",
+            "VSS"
+          ],
+          [
+            "U2",
+            "GND"
+          ],
+          [
+            "C1",
+            "2"
+          ],
+          [
+            "C2",
+            "2"
+          ]
+        ]
+      },
+      {
+        "net": "I2C_SDA",
+        "connections": [
+          [
+            "U1",
+            "PB7"
+          ],
+          [
+            "U2",
+            "SDA"
+          ],
+          [
+            "R1",
+            "2"
+          ]
+        ]
+      },
+      {
+        "net": "I2C_SCL",
+        "connections": [
+          [
+            "U1",
+            "PB6"
+          ],
+          [
+            "U2",
+            "SCL"
+          ],
+          [
+            "R2",
+            "2"
+          ]
+        ]
+      }
+    ],
+    "rails": {
+      "+3V3": 3.3,
+      "GND": 0
+    }
+  }
+}

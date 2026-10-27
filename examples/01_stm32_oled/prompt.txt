@@ -1,0 +1,1 @@
+STM32F103C8 with an SSD1306 OLED display on I2C and pull-up resistors and a status LED

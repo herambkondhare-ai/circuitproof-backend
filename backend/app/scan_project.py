@@ -115,7 +115,8 @@ def run_erc(sch_path):
     for sheet in report.get("sheets", []):
         for v in sheet.get("violations", []):
             items.append({"severity": v.get("severity", ""), "type": v.get("type", ""),
-                          "description": v.get("description", "")})
+                          "description": v.get("description", ""),
+                          "pins": [i.get("description", "") for i in v.get("items", [])]})
     return {"errors": sum(1 for i in items if i["severity"] == "error"),
             "warnings": sum(1 for i in items if i["severity"] == "warning"),
             "items": items}

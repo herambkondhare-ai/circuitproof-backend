@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#31D8F5"/>
+      <stop offset="50%" stop-color="#3984FF"/>
+      <stop offset="100%" stop-color="#9565FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0D1220" stroke="#26344A" stroke-width="2"/>
+  <rect x="18" y="18" width="28" height="28" rx="5" fill="none" stroke="url(#grad)" stroke-width="3"/>
+  <circle cx="32" cy="32" r="6" fill="#31D8F5"/>
+  <!-- Pins -->
+  <line x1="12" y1="24" x2="18" y2="24" stroke="#31D8F5" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="12" y1="32" x2="18" y2="32" stroke="#3984FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="12" y1="40" x2="18" y2="40" stroke="#9565FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="46" y1="24" x2="52" y2="24" stroke="#31D8F5" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="46" y1="32" x2="52" y2="32" stroke="#3984FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="46" y1="40" x2="52" y2="40" stroke="#9565FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="24" y1="12" x2="24" y2="18" stroke="#31D8F5" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="32" y1="12" x2="32" y2="18" stroke="#3984FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="40" y1="12" x2="40" y2="18" stroke="#9565FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="24" y1="46" x2="24" y2="52" stroke="#31D8F5" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="32" y1="46" x2="32" y2="52" stroke="#3984FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="40" y1="46" x2="40" y2="52" stroke="#9565FF" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

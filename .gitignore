@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.env.*
+venv/
+.venv/
+env/
+*.log
+.vscode/
+.idea/
+.DS_Store
+.claude/
+
+# CircuitProof generated files
+backend/data/*.db
+backend/data/*.json
+backend/data/*.tmp
+backend/exports/*
+!backend/exports/.gitkeep
+backend/app/symbols/

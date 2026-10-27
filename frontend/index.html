@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CircuitProof — AI Agentic Hardware Studio</title>
+<meta name="description" content="Autonomous agentic hardware design, verification, and KiCad schematic synthesis engine powered by NVIDIA Nemotron & deterministic electrical referee rules.">
+<meta name="keywords" content="EDA, KiCad, schematic synthesis, circuit verification, hardware design, AI hardware, electronics engineering">
+<meta name="author" content="CircuitProof Labs">
+<meta name="robots" content="index, follow">
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="http://127.0.0.1:8000/">
+<meta property="og:title" content="CircuitProof — Autonomous Agentic Hardware Studio">
+<meta property="og:description" content="From natural language circuit requirements to verified, bounded KiCad schematics and deterministic electrical rule checks.">
+<meta property="og:image" content="/og-image.jpg">
+
+<!-- Twitter Cards -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:url" content="http://127.0.0.1:8000/">
+<meta name="twitter:title" content="CircuitProof — AI Agentic Hardware Studio">
+<meta name="twitter:description" content="Autonomous agentic hardware design and KiCad schematic synthesis engine.">
+<meta name="twitter:image" content="/og-image.jpg">
+
+<!-- Favicon Set -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon.svg">
+
+<style>
+/* Calm, conventional light theme: neutral surfaces, one blue accent, no glows or gradients. */
+:root {
+  color-scheme: light;
+  --bg: #F5F6F8;     /* app background */
+  --bg2: #FFFFFF;    /* header, sidebar, footer */
+  --el: #FFFFFF;     /* panels and controls */
+  --bd: #DCE0E6;     /* borders */
+  --blue: #2563EB;   /* the one accent colour */
+  --cyan: #2563EB;   /* kept as an alias so existing markup keeps working */
+  --vio: #6D5BD0;
+  --ok: #15803D;
+  --warn: #B45309;
+  --bad: #DC2626;
+  --tx: #1F2937;
+  --tx2: #6B7280;
+  --hover: #F1F3F6;
+  --accent-bg: #EFF4FF;
+  --mono: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--tx);
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+#app {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  grid-template-rows: 48px 1fr 28px;
+  height: 100%;
+  flex: 1;
+}
+
+/* Header */
+header {
+  grid-column: 1/3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--bd);
+  z-index: 10;
+}
+.logo { font-weight: 600; display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.logo i { width: 10px; height: 10px; border-radius: 2px; background: var(--blue); }
+.crumb { color: var(--tx2); font-size: 12px; white-space: nowrap; }
+.sp { flex: 1; }
+.cmd {
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  padding: 5px 12px;
+  color: var(--tx2);
+  min-width: 170px;
+  text-align: left;
+  font-size: 12px;
+}
+.cmd:hover { border-color: #B8C0CC; color: var(--tx); }
+.pill {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--bd);
+  color: var(--tx2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--el);
+  white-space: nowrap;
+}
+.pill b { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+.pill.connected b { background: var(--ok); }
+.pill.connected { color: var(--ok); border-color: #BBE5C8; background: #F0FAF3; }
+.pill.error b { background: var(--bad); }
+.pill.error { color: var(--bad); border-color: #F5C2C2; background: #FDF2F2; }
+
+/* Buttons */
+.btn {
+  background: var(--blue);
+  border: 1px solid var(--blue);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-weight: 600;
+  color: #fff;
+  transition: background .12s, opacity .12s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn:hover:not(:disabled) { background: #1D4ED8; border-color: #1D4ED8; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-secondary {
+  background: var(--el);
+  border: 1px solid var(--bd);
+  color: var(--tx);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.btn-secondary:hover { background: var(--hover); border-color: #B8C0CC; }
+
+/* Navigation Sidebar */
+nav {
+  background: var(--bg2);
+  border-right: 1px solid var(--bd);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  gap: 6px;
+}
+nav button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  position: relative;
+  color: var(--tx2);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
+}
+nav button:hover { background: var(--hover); color: var(--tx); }
+nav button.on { background: var(--accent-bg); color: var(--blue); }
+nav button.on::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--blue);
+}
+nav button[data-t]:hover::after {
+  content: attr(data-t);
+  position: absolute;
+  left: 48px;
+  top: 8px;
+  background: #1F2937;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 100;
+}
+
+/* Main Area */
+main {
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+}
+.view { display: none; height: 100%; position: relative; }
+.view.on { display: grid; }
+
+/* Panels */
+.panel {
+  position: relative;
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  margin: 5px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+}
+.ph {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--bd);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pb { padding: 12px; overflow: auto; flex: 1; min-height: 0; }
+
+/* Studio Layout */
+#studio { grid-template-columns: 310px 1fr 310px; grid-template-rows: 1fr 230px; }
+.hero { margin-bottom: 12px; }
+.hero h2 { margin: 0 0 4px; font-size: 16px; line-height: 1.25; font-weight: 600; color: var(--tx); }
+.hero p { margin: 0; font-size: 12px; color: var(--tx2); }
+
+/* Presets */
+.presets { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+.preset-tag {
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--tx2);
+}
+.preset-tag:hover { background: var(--hover); color: var(--tx); }
+
+textarea {
+  width: 100%;
+  height: 100px;
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  color: var(--tx);
+  padding: 8px 10px;
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  resize: vertical;
+  transition: border-color .15s;
+}
+textarea.input-error, input.input-error { border-color: var(--bad) !important; background: #FDF2F2; }
+.field-error-msg {
+  color: var(--bad);
+  font-size: 12px;
+  margin-top: 4px;
+  display: none;
+}
+.field-error-msg.visible { display: block; }
+
+textarea:focus, input:focus, select:focus, button:focus-visible {
+  outline: 2px solid #93B4F7;
+  outline-offset: 1px;
+  border-color: var(--blue);
+}
+.mut { color: var(--tx2); }
+.mono { font-family: var(--mono); }
+
+/* Messages */
+.msg {
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  padding: 9px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.msg.ai { border-left: 3px solid var(--blue); }
+.msg h5 { margin: 0 0 5px; font-size: 11px; font-weight: 600; color: var(--tx2); }
+
+/* Artifacts */
+.art {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--bd);
+  font-size: 12px;
+}
+.art span:first-child { font-family: var(--mono); word-break: break-all; }
+
+/* Status Flow */
+.flow { display: flex; gap: 4px; flex-wrap: wrap; margin: 10px 0; }
+.flow div {
+  font-size: 11px;
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  padding: 3px 8px;
+  position: relative;
+  padding-left: 14px;
+  color: var(--tx2);
+  background: var(--el);
+}
+.flow div::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.flow .done { border-color: #BBE5C8; color: var(--ok); background: #F0FAF3; }
+.flow .prog { border-color: #BFD3FB; color: var(--blue); background: var(--accent-bg); }
+.flow .pend { color: var(--tx2); }
+
+/* Schematic Canvas */
+.canvaswrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #FAFBFC;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+.canvaswrap svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.canvaswrap svg:active { cursor: grabbing; }
+.tb {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--bd);
+  align-items: center;
+}
+.tb button, .tab {
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.tb button:hover, .tab:hover { background: var(--hover); }
+.tb button.on, .tab.on { border-color: #BFD3FB; color: var(--blue); background: var(--accent-bg); }
+.warnbar {
+  font-size: 12px;
+  color: var(--warn);
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--bd);
+  background: #FFFBEB;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tx2);
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--bd);
+  position: sticky;
+  top: 0;
+  background: #F9FAFB;
+  z-index: 2;
+}
+td { padding: 7px 10px; border-bottom: 1px solid #ECEEF2; font-size: 12px; }
+tr.row { cursor: pointer; }
+tr.row:hover, tr.sel { background: var(--accent-bg); }
+
+/* Badges */
+.st {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid;
+  white-space: nowrap;
+  display: inline-block;
+}
+.PASS { color: var(--ok); border-color: #BBE5C8; background: #F0FAF3; }
+.FAIL { color: var(--bad); border-color: #F5C2C2; background: #FDF2F2; }
+.WARNING, .MANUAL { color: var(--warn); border-color: #F5D9A8; background: #FFFBEB; }
+.NE { color: var(--tx2); border-color: var(--bd); background: #F9FAFB; }
+.INC { color: var(--vio); border-color: #D6D0F3; background: #F6F4FD; }
+
+.kv { display: grid; grid-template-columns: 110px 1fr; gap: 5px 10px; font-size: 12px; }
+.kv dt { color: var(--tx2); }
+.kv dd { margin: 0; font-family: var(--mono); word-break: break-word; }
+
+/* Verification View */
+#verify { grid-template-rows: auto 1fr; padding: 6px; overflow: auto; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; padding: 6px 0; }
+.chip {
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-width: 120px;
+  position: relative;
+  overflow: hidden;
+}
+.chip::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--bd); }
+.chip b { display: block; font: 600 22px system-ui, -apple-system, "Segoe UI", sans-serif; margin-top: 4px; }
+.seg { display: flex; gap: 3px; margin: 4px 0 8px; }
+.seg i { flex: 1; height: 8px; border-radius: 2px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; height: calc(100% - 150px); min-height: 380px; }
+
+/* Generic Full Views */
+.fullview { padding: 10px; overflow: auto; height: 100%; display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--el); border: 1px solid var(--bd); border-radius: 8px; padding: 14px; }
+input[type="text"] {
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  color: var(--tx);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+select {
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  color: var(--tx);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+/* Skeleton Loading State */
+.skeleton {
+  background: linear-gradient(90deg, #EEF0F3 25%, #F6F7F9 50%, #EEF0F3 75%);
+  background-size: 200% 100%;
+  animation: skel 1.5s infinite;
+  border-radius: 4px;
+  height: 18px;
+  margin: 6px 0;
+}
+@keyframes skel { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Toast Notifications */
+#toast-container {
+  position: fixed;
+  bottom: 35px;
+  right: 15px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-left: 4px solid var(--blue);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(16, 24, 40, .10);
+  min-width: 240px;
+}
+.toast.success { border-left-color: var(--ok); }
+.toast.error { border-left-color: var(--bad); }
+
+/* Modal Dialogs */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, .45);
+  z-index: 1000;
+  display: none;
+  place-items: center;
+}
+.modal-overlay.open { display: grid; }
+.modal {
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 520px;
+  width: 90%;
+  box-shadow: 0 12px 32px rgba(16, 24, 40, .18);
+}
+
+/* Cookie / Consent Banner */
+#cookie-banner {
+  position: fixed;
+  bottom: 36px;
+  left: 20px;
+  right: 20px;
+  max-width: 650px;
+  margin: 0 auto;
+  background: var(--el);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 6px 20px rgba(16, 24, 40, .12);
+  z-index: 900;
+}
+#cookie-banner.hidden { display: none; }
+
+/* Sticky Mobile CTA Bar */
+#mobile-cta-bar {
+  display: none;
+  position: fixed;
+  bottom: 28px;
+  left: 0;
+  right: 0;
+  background: var(--bg2);
+  border-top: 1px solid var(--bd);
+  padding: 8px 12px;
+  z-index: 800;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Footer */
+footer {
+  grid-column: 1/3;
+  background: var(--bg2);
+  border-top: 1px solid var(--bd);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  font-size: 12px;
+  color: var(--tx2);
+}
+footer a { color: var(--tx2); }
+footer a:hover { color: var(--blue); }
+
+/* Activity indicators (only shown while something is running) */
+.wf { stroke-dasharray: 6 6; }
+.dot { animation: p 1.6s infinite; }
+@keyframes p { 50% { opacity: .35; } }
+
+/* Mobile */
+.mobtabs { display: none; }
+@media (max-width: 900px) {
+  #studio { grid-template-columns: 1fr; grid-template-rows: auto; overflow: auto; display: none; }
+  #studio.on { display: block; }
+  #studio > .panel { height: 70vh; margin: 5px; }
+  #studio > .panel.hide { display: none; }
+  .mobtabs { display: flex; gap: 4px; padding: 5px; position: sticky; top: 0; background: var(--bg); z-index: 3; }
+  .cmd, .crumb { display: none; }
+  .two { grid-template-columns: 1fr; }
+  #mobile-cta-bar { display: flex; }
+  body { padding-bottom: 48px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 1. Header with CTA above the fold -->
+  <header>
+    <div class="logo" id="home-logo" title="CircuitProof Home">
+      <i></i>CircuitProof
+    </div>
+    <span class="crumb" id="crumb">Workspace / AI Design Studio</span>
+    <span class="sp"></span>
+    <button class="cmd" id="cmdk" aria-label="Quick Search and Actions (Ctrl+K)">Search / Actions · Ctrl K</button>
+    <span class="pill" id="status-pill" aria-label="Backend status"><b></b>Checking Backend...</span>
+    <button class="btn" id="newd" aria-label="Create New Hardware Design">＋ New Design</button>
+  </header>
+
+  <!-- 2. Navigation Sidebar -->
+  <nav id="nav" aria-label="Main Navigation"></nav>
+
+  <!-- 3. Main Views -->
+  <main>
+    <!-- View 1: Studio -->
+    <section class="view on" id="studio">
+      <div class="mobtabs" id="mt"></div>
+      
+      <!-- Left Panel: Requirements & Copilot -->
+      <div class="panel" id="p-left">
+        <div class="ph">Requirements &amp; Copilot <span class="st PASS" id="ai-engine-tag" style="margin-left:auto;font-size:9px">AI Connected</span></div>
+        <div class="pb">
+          <div class="hero">
+            <h2>Describe your circuit.<br>Verify the engineering.<br>Generate the schematic.</h2>
+            <p>From Ideas to Verified Hardware</p>
+          </div>
+          
+          <div class="presets" aria-label="Quick start prompt presets">
+            <button class="preset-tag" data-p="Design an STM32F103 sensor interface with a BNO085 IMU over I2C, 3.3V supply rail, and W25Q128JV SPI flash memory.">STM32 + BNO085 + Flash</button>
+            <button class="preset-tag" data-p="Create an ESP32 microcontroller circuit with PCA9306 level translator, 3.3V to 5V I2C bus conversion, and 4.7k pull-up resistors.">ESP32 + Level Translator</button>
+            <button class="preset-tag" data-p="Raspberry Pi Pico RP2040 circuit connected to an SPI display, I2C temperature sensor, and 100nF decoupling capacitors.">RP2040 + Display + Sensor</button>
+          </div>
+
+          <textarea id="prompt" maxlength="600" aria-label="Design requirement" placeholder="Enter hardware requirements e.g. STM32 MCU, BNO085 IMU, I2C pullups, SPI flash...">Design an STM32 sensor interface with a BNO085 IMU over I2C, a 3.3V supply, and SPI flash. Identify electrical constraints and generate a KiCad schematic.</textarea>
+          <div class="field-error-msg" id="prompt-error">⚠️ Please provide circuit requirements to generate a schematic.</div>
+          
+          <div class="mut mono" style="font-size:10px;display:flex;justify-content:space-between;margin:4px 0 8px">
+            <span id="cc">0/600</span>
+            <span id="backend-status-hint">Connected to local SQLite referee</span>
+          </div>
+          
+          <!-- Primary CTA Above the fold -->
+          <button class="btn" id="gen" style="width:100%" aria-label="Generate Hardware Design">
+            <span>Generate Design →</span>
+          </button>
+          
+          <div class="flow" id="flow" aria-label="Synthesis pipeline progress"></div>
+          
+          <h5 class="mut" style="margin:14px 0 6px;font-size:10px;letter-spacing:.08em">COPILOT ANALYSIS</h5>
+          <div class="msg">
+            <h5>Requirement</h5>
+            <div id="req-text">STM32 + BNO085 (I2C) + SPI flash, 3.3 V.</div>
+          </div>
+          <div class="msg ai">
+            <h5>AI Explanation · Engineering Assessment</h5>
+            <div id="ai-explanation">Synthesizer places components within A4 bounds and checks I2C voltage levels (VOH ≥ VIH) &amp; SPI bus frequencies.</div>
+          </div>
+          <div class="msg">
+            <h5>Synthesized Artifacts</h5>
+            <div class="art">
+              <span id="art-sch-name">design.kicad_sch</span>
+              <button class="btn-secondary" id="dl-sch-btn" style="padding:2px 8px">Download</button>
+            </div>
+            <div class="art">
+              <span id="art-rep-name">audit_report.md</span>
+              <button class="btn-secondary" id="dl-rep-btn" style="padding:2px 8px">Download</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mid Panel: Schematic Canvas -->
+      <div class="panel" id="p-mid">
+        <div class="ph">
+          Schematic · Bounded KiCad Canvas
+          <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--tx2)" id="sch-coords-info">A4 Sheet: 297 x 210 mm</span>
+        </div>
+        <div class="tb" id="tb">
+          <button id="zi" aria-label="Zoom In">＋ Zoom In</button>
+          <button id="zo" aria-label="Zoom Out">－ Zoom Out</button>
+          <button id="fit" aria-label="Fit View">Fit View</button>
+          <button id="rs" aria-label="Reset View">Reset</button>
+          <button id="tg" class="on" aria-label="Toggle Grid">Grid</button>
+          <button id="tn" class="on" aria-label="Toggle Net Labels">Nets</button>
+          <button id="tr" class="on" aria-label="Toggle Reference Designators">Refs</button>
+          <button id="tw" class="on" aria-label="Toggle Wires">Wires</button>
+        </div>
+        <div class="warnbar" id="warnbar">
+          <span>⚡ A4 Bounded: Components and auto-routed wires are strictly placed within KiCad sheet limits.</span>
+        </div>
+        <div class="canvaswrap">
+          <svg id="svg" viewBox="0 0 600 360" role="img" aria-label="Interactive schematic canvas"></svg>
+        </div>
+      </div>
+
+      <!-- Right Panel: Inspector -->
+      <div class="panel" id="p-right">
+        <div class="ph">Component Inspector</div>
+        <div class="pb" id="insp"></div>
+      </div>
+
+      <!-- Bottom Panel: Data & Findings -->
+      <div class="panel" id="p-bot" style="grid-column:1/4">
+        <div class="tabs" id="btabs"></div>
+        <div class="pb" id="bbody" style="padding:0"></div>
+      </div>
+    </section>
+
+    <!-- View 2: Verification Center -->
+    <section class="view" id="verify">
+      <div>
+        <div class="seg" id="bar" title="Verification findings breakdown"></div>
+        <div class="chips" id="chips"></div>
+        <div class="two">
+          <div class="panel">
+            <div class="ph">Deterministic Rule Findings <button class="btn-secondary" id="reverify-btn" style="margin-left:auto">Run Audit</button></div>
+            <div class="pb scroll" style="padding:0" id="ftab"></div>
+          </div>
+          <div class="panel">
+            <div class="ph">Finding Detail &amp; Remediation</div>
+            <div class="pb" id="fdet"></div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:6px">
+          <div class="ph">Verification Scope &amp; Safety Guarantees</div>
+          <div class="pb mut" style="font-size:12px;line-height:1.5">
+            The referee checks: supply pins on rails within each part's range, ground pins on ground, unconnected power pins,
+            I2C pull-ups (present, sized 1k–10k, rail voltage within every device's input limits), SPI clock limits, and dangling nets.
+            When datasheet data is missing, the check is reported as NOT EVALUATED instead of being assumed to pass.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 3: Component Library (parts with electrical facts) -->
+    <section class="view" id="components-view">
+      <div class="fullview">
+        <div class="card">
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <h3 style="margin:0;font-size:15px">SQLite Hardware Component Library</h3>
+            <span class="pill" id="comp-count-pill"><b></b>Loading database...</span>
+            <div class="sp"></div>
+            <input type="text" id="comp-search" placeholder="Search STM32, BNO, ESP32, Flash..." style="width:260px" aria-label="Search components">
+            <select id="comp-cat-select" aria-label="Filter category"><option value="">All Categories</option></select>
+            <button class="btn" id="comp-search-btn" style="padding:6px 14px">Search</button>
+          </div>
+        </div>
+        <div class="panel" style="flex:1;margin:0">
+          <div class="ph">Components Catalog <span style="margin-left:auto" id="comp-page-info"></span></div>
+          <div class="pb" style="padding:0" id="comp-table-wrap"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 4: Design Recipes -->
+    <section class="view" id="recipes-view">
+      <div class="fullview">
+        <div class="card">
+          <h3 style="margin:0 0 6px;font-size:15px">Reference Designs</h3>
+          <p class="mut" style="margin:0">Designs that pass the referee. Use them as starting points or demo inputs.</p>
+        </div>
+        <div class="panel" style="flex:1;margin:0">
+          <div class="ph">Interface Recipes</div>
+          <div class="pb" id="recipes-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 5: Knowledge & Mistakes -->
+    <section class="view" id="mistakes-view">
+      <div class="fullview">
+        <div class="card">
+          <h3 style="margin:0 0 6px;font-size:15px">Knowledge Store &amp; Mistake Memory</h3>
+          <p class="mut" style="margin:0">Continuous learning memory: logged electrical violations and engineering fixes.</p>
+        </div>
+        <div class="two" style="flex:1">
+          <div class="panel" style="margin:0">
+            <div class="ph">Logged Mistakes &amp; Remedies</div>
+            <div class="pb" style="padding:0" id="mistakes-list"></div>
+          </div>
+          <div class="panel" style="margin:0">
+            <div class="ph">Record New Design Rule / Mistake</div>
+            <div class="pb">
+              <label class="mut" style="font-size:11px;display:block;margin-bottom:4px">Design Violation Description</label>
+              <textarea id="new-violation" style="height:80px;margin-bottom:6px" placeholder="e.g. Connecting 3.3V MCU directly to 5V 50MHz SPI bus without translator"></textarea>
+              <div class="field-error-msg" id="mistake-viol-error">⚠️ Violation text is required.</div>
+              
+              <label class="mut" style="font-size:11px;display:block;margin:10px 0 4px">Recommended Engineering Fix</label>
+              <textarea id="new-fix" style="height:80px;margin-bottom:6px" placeholder="e.g. Insert TXS0108E high-speed bidirectional level shifter"></textarea>
+              <div class="field-error-msg" id="mistake-fix-error">⚠️ Fix recommendation is required.</div>
+              
+              <button class="btn" id="save-mistake-btn" style="margin-top:10px">Save Rule to Knowledge Store</button>
+              <div id="mistake-msg" style="margin-top:10px;font-family:var(--mono);font-size:11px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 6: Project Scanner -->
+    <section class="view" id="scanner-view">
+      <div class="fullview">
+        <div class="card">
+          <h3 style="margin:0 0 6px;font-size:15px">Recursive KiCad Project Scanner</h3>
+          <p class="mut" style="margin:0 0 12px">Recursively crawls folders for <code>*.kicad_sch</code> files, parses symbols with <code>sexpdata</code>, and catalogs them into SQLite.</p>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input type="text" id="scan-dir-input" value="." style="flex:1" placeholder="Directory path (default '.' for workspace root)" aria-label="Directory to scan">
+            <button class="btn" id="run-scan-btn">Scan Schematics →</button>
+          </div>
+        </div>
+        <div class="panel" style="flex:1;margin:0">
+          <div class="ph">Scan Results &amp; Discovered Schematics</div>
+          <div class="pb" id="scan-results-wrap">
+            <div class="empty">Enter a directory path and click "Scan Schematics" to parse KiCad projects.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 7: Audit Reports -->
+    <section class="view" id="reports-view">
+      <div class="fullview">
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <h3 style="margin:0 0 4px;font-size:15px">Engineering Audit Report</h3>
+            <p class="mut" style="margin:0">Automated design audit documentation generated by CircuitProof Referee.</p>
+          </div>
+          <button class="btn" id="dl-cur-rep-btn">Download Markdown (.md)</button>
+        </div>
+        <div class="panel" style="flex:1;margin:0">
+          <div class="ph">Report Content</div>
+          <div class="pb" id="report-view-wrap" style="font-family:var(--mono);white-space:pre-wrap;line-height:1.5"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 8: Schematic Workspace (Raw KiCad Viewer) -->
+    <section class="view" id="schematic-view">
+      <div class="fullview">
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <h3 style="margin:0 0 4px;font-size:15px">KiCad Native Schematic S-Expression Workspace</h3>
+            <p class="mut" style="margin:0">Authoritative KiCad 7/8 <code>.kicad_sch</code> output generated by Bounded Synthesizer.</p>
+          </div>
+          <button class="btn" id="dl-cur-sch-btn">Download .kicad_sch</button>
+        </div>
+        <div class="panel" style="flex:1;margin:0">
+          <div class="ph">S-Expression Code Viewer</div>
+          <div class="pb" style="padding:0">
+            <pre id="raw-sch-code" class="mono" style="margin:0;padding:14px;font-size:11px;color:var(--tx2);overflow:auto;height:100%"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 4. Footer -->
+  <footer>
+    <span>⚡ CircuitProof v2.0.0</span>
+    <span>•</span>
+    <span><a href="/privacy" target="_blank">Privacy</a></span>
+    <span><a href="/terms" target="_blank">Terms</a></span>
+    <span><a href="/contact" target="_blank">Project</a></span>
+    <span><a href="/robots.txt" target="_blank">robots.txt</a></span>
+    <span><a href="/sitemap.xml" target="_blank">sitemap.xml</a></span>
+    <span class="sp"></span>
+    <span>Hackathon prototype · review designs against datasheets before building</span>
+  </footer>
+</div>
+
+<!-- Sticky Mobile CTA Bar -->
+<div id="mobile-cta-bar">
+  <span style="font-size:11px;font-family:var(--mono);color:var(--cyan)">⚡ CircuitProof Studio</span>
+  <button class="btn" id="mobile-gen-btn" style="padding:5px 12px;font-size:11px">Generate Design →</button>
+</div>
+
+<!-- Thank-You / Generation Complete Modal -->
+<div class="modal-overlay" id="thankyou-modal">
+  <div class="modal">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span style="font-size:24px">🎉</span>
+      <h3 id="ty-title" style="margin:0;font-size:18px;color:var(--cyan)">Schematic generated</h3>
+    </div>
+    <p id="ty-text" class="mut" style="line-height:1.6;margin:0 0 16px">
+      Your design has been processed, bounded to standard A4 sheet coordinates, and verified against electrical referee rules.
+    </p>
+    <div style="background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:12px;margin-bottom:16px;font-family:var(--mono);font-size:11px">
+      <div><b>Schematic File:</b> <span id="ty-sch-name" style="color:var(--ok)">design.kicad_sch</span></div>
+      <div><b>Audit Report:</b> <span id="ty-rep-name" style="color:var(--ok)">audit_report.md</span></div>
+      <div><b>Referee Findings:</b> <span id="ty-find-count">6 checks completed</span></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn-secondary" id="ty-close-btn">Close</button>
+      <button class="btn" id="ty-dl-all-btn">Download .kicad_sch</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Cookie & Telemetry Banner -->
+<div id="cookie-banner">
+  <div style="font-size:18px">🍪</div>
+  <div style="flex:1;font-size:11px;color:var(--tx2);line-height:1.4">
+    CircuitProof uses essential local storage and anonymous privacy-friendly telemetry to improve hardware rule checking and remember your workspace state.
+  </div>
+  <button class="btn-secondary" id="cookie-decline">Essential Only</button>
+  <button class="btn" id="cookie-accept" style="padding:4px 12px;font-size:11px">Accept All</button>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const API_BASE = window.location.origin;
+
+// Navigation items matching sidebar
+const NAV = [
+  ["✦", "AI Design Studio", "studio"],
+  ["⌗", "Schematic Workspace", "schematic-view"],
+  ["✔", "Verification Center", "verify"],
+  ["▤", "Component Library", "components-view"],
+  ["❖", "Design Recipes", "recipes-view"],
+  ["⚑", "Knowledge & Mistakes", "mistakes-view"],
+  ["⌕", "Project Scanner", "scanner-view"],
+  ["☰", "Audit Reports", "reports-view"]
+];
+
+const META_DESCRIPTIONS = {
+  "studio": "CircuitProof AI Design Studio - Natural language hardware synthesis to A4-bounded KiCad schematics.",
+  "schematic-view": "Inspect raw KiCad 7/8 S-expression syntax and download production schematics.",
+  "verify": "Deterministic electrical verification center: logic-level matching and bus timing analysis.",
+  "components-view": "Parts with electrical facts in the knowledge store, and the KiCad symbols they map to.",
+  "recipes-view": "Reference designs that pass the referee.",
+  "mistakes-view": "Continuous learning mistake memory cataloging observed violations and engineering fixes.",
+  "scanner-view": "Recursive KiCad schematic crawler extracting symbol libraries into SQLite.",
+  "reports-view": "Automated engineering audit reports with full pass/fail verification matrices."
+};
+
+// State
+let currentDesign = {
+  projectName: "circuitproof_design",
+  components: [
+    { reference: "U1", lib_id: "MCU_ST_STM32F1:STM32F103C8Tx", part: "STM32F103C8T6", category: "MCU", x: 60, y: 50, w: 140, h: 180, pins: ["PB6 I2C1_SCL", "PB7 I2C1_SDA", "PA5 SPI1_SCK", "PA6 SPI1_MISO", "PA7 SPI1_MOSI", "PA4 SPI1_NSS", "VDD", "GND"] },
+    { reference: "U2", lib_id: "Sensor_Motion:BNO085", part: "BNO085 IMU", category: "Sensor", x: 260, y: 50, w: 120, h: 120, pins: ["SCL", "SDA", "VDD", "GND"] },
+    { reference: "U3", lib_id: "Memory_Flash:W25Q128JV", part: "W25Q128JV Flash", category: "Memory", x: 260, y: 200, w: 120, h: 130, pins: ["CLK", "DI", "DO", "CS", "VCC", "GND"] },
+    { reference: "R1", lib_id: "Device:R", part: "4.7k Pullup", category: "Resistor", x: 440, y: 50, w: 70, h: 50, pins: ["1", "2"] },
+    { reference: "R2", lib_id: "Device:R", part: "4.7k Pullup", category: "Resistor", x: 440, y: 120, w: 70, h: 50, pins: ["1", "2"] },
+    { reference: "C1", lib_id: "Device:C", part: "100nF Bypass", category: "Capacitor", x: 440, y: 200, w: 70, h: 50, pins: ["1", "2"] }
+  ],
+  nets: [
+    { net: "3V3", connections: [["U1", "VDD"], ["U2", "VDD"], ["U3", "VCC"]] },
+    { net: "GND", connections: [["U1", "GND"], ["U2", "GND"], ["U3", "GND"]] },
+    { net: "I2C_SDA", connections: [["U1", "PB7"], ["U2", "SDA"]] },
+    { net: "I2C_SCL", connections: [["U1", "PB6"], ["U2", "SCL"]] },
+    { net: "SPI_SCK", connections: [["U1", "PA5"], ["U3", "CLK"]] },
+    { net: "SPI_MOSI", connections: [["U1", "PA7"], ["U3", "DI"]] },
+    { net: "SPI_MISO", connections: [["U1", "PA6"], ["U3", "DO"]] },
+    { net: "SPI_CS", connections: [["U1", "PA4"], ["U3", "CS"]] }
+  ],
+  findings: [],
+  schematicContent: "",
+  reportContent: ""
+};
+
+let selectedCompRef = null;
+let selectedFindingId = null;
+let bottomTab = "Components";
+let showOptions = { grid: 1, nets: 1, refs: 1, wires: 1 };
+let viewBox = { x: 0, y: 0, w: 600, h: 360 };
+
+// Toast Notification Engine
+function showToast(message, type = "info") {
+  const container = $("#toast-container");
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateX(100%)";
+    toast.style.transition = "all 0.3s";
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+// Telemetry Client
+function trackEvent(eventName, properties = {}) {
+  if (localStorage.getItem("circuitproof_consent") === "declined") return;
+  fetch(API_BASE + "/api/analytics", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event_name: eventName, properties })
+  }).catch(() => {});
+}
+
+// Cookie Banner Management
+if (!localStorage.getItem("circuitproof_consent")) {
+  $("#cookie-banner").classList.remove("hidden");
+} else {
+  $("#cookie-banner").classList.add("hidden");
+}
+$("#cookie-accept").onclick = () => {
+  localStorage.setItem("circuitproof_consent", "accepted");
+  $("#cookie-banner").classList.add("hidden");
+  showToast("Preferences saved: Analytics enabled", "success");
+  trackEvent("consent_accepted");
+};
+$("#cookie-decline").onclick = () => {
+  localStorage.setItem("circuitproof_consent", "declined");
+  $("#cookie-banner").classList.add("hidden");
+  showToast("Preferences saved: Essential storage only");
+};
+
+// Status labels
+const RESULT_LABELS = {
+  PASS: "PASS",
+  FAIL: "FAIL",
+  WARNING: "WARNING",
+  NE: "NOT EVALUATED",
+  INC: "INCOMPLETE",
+  MANUAL: "MANUAL REVIEW"
+};
+const stBadge = r => `<span class="st ${r}">${RESULT_LABELS[r] || r}</span>`;
+
+// Initialize Navigation
+NAV.forEach(([icon, title, viewId]) => {
+  const btn = document.createElement("button");
+  btn.textContent = icon;
+  btn.dataset.t = title;
+  btn.setAttribute("aria-label", title);
+  if (viewId === "studio") btn.classList.add("on");
+  btn.onclick = () => switchView(viewId, title, btn);
+  $("#nav").append(btn);
+});
+
+function switchView(viewId, title, navBtn) {
+  document.querySelectorAll("nav button").forEach(b => b.classList.remove("on"));
+  if (navBtn) navBtn.classList.add("on");
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("on"));
+  const target = $("#" + viewId);
+  if (target) target.classList.add("on");
+  $("#crumb").textContent = "Workspace / " + title;
+
+  // SEO & Meta updates per page
+  document.title = `CircuitProof | ${title}`;
+  const metaDesc = document.querySelector('meta[name="description"]');
+  if (metaDesc && META_DESCRIPTIONS[viewId]) {
+    metaDesc.setAttribute("content", META_DESCRIPTIONS[viewId]);
+  }
+
+  trackEvent("view_switched", { view: viewId, title });
+
+  // Lazy loading
+  if (viewId === "components-view") loadComponents(0);
+  if (viewId === "recipes-view") loadRecipes();
+  if (viewId === "mistakes-view") loadMistakes();
+  if (viewId === "reports-view") renderReportView();
+  if (viewId === "schematic-view") renderSchematicCode();
+}
+
+$("#home-logo").onclick = () => switchView("studio", "AI Design Studio", $("#nav button"));
+
+// Mobile layout tabs
+["left", "mid", "right", "bot"].forEach((panelKey, idx) => {
+  const btn = document.createElement("button");
+  btn.className = "tab" + (idx === 1 ? " on" : "");
+  btn.textContent = ["Prompt", "Schematic", "Inspector", "Data"][idx];
+  btn.onclick = () => {
+    document.querySelectorAll("#mt .tab").forEach(x => x.classList.remove("on"));
+    btn.classList.add("on");
+    ["left", "mid", "right", "bot"].forEach(z => $("#p-" + z).classList.toggle("hide", z !== panelKey));
+  };
+  $("#mt").append(btn);
+});
+if (innerWidth <= 900) {
+  ["left", "right", "bot"].forEach(z => $("#p-" + z).classList.add("hide"));
+}
+
+// Character counter
+$("#prompt").oninput = () => {
+  $("#prompt").classList.remove("input-error");
+  $("#prompt-error").classList.remove("visible");
+  $("#cc").textContent = $("#prompt").value.length + "/600";
+};
+$("#cc").textContent = $("#prompt").value.length + "/600";
+
+// Presets
+document.querySelectorAll(".preset-tag").forEach(b => {
+  b.onclick = () => {
+    $("#prompt").value = b.dataset.p;
+    $("#prompt").classList.remove("input-error");
+    $("#prompt-error").classList.remove("visible");
+    $("#cc").textContent = $("#prompt").value.length + "/600";
+    showToast("Template requirement loaded");
+  };
+});
+
+// Flow pipeline steps
+const STEPS = ["Understand", "Plan", "Verify", "Synthesize", "Deliver"];
+function updateFlow(states) {
+  $("#flow").innerHTML = STEPS.map((step, i) => {
+    const s = states[i] || "pend";
+    return `<div class="${s}">${String(i + 1).padStart(2, "0")} ${step}${s === "prog" ? ' <span class="dot">●</span>' : ''}</div>`;
+  }).join("");
+}
+updateFlow(["pend", "pend", "pend", "pend", "pend"]);
+
+// Turn a FastAPI error response into a readable message
+async function apiError(res) {
+  let detail = "";
+  try {
+    const body = await res.json();
+    const d = body.detail;
+    if (typeof d === "string") detail = d;
+    else if (d && d.message) {
+      detail = d.message;
+      const last = (d.history || []).slice(-1)[0];
+      if (last) detail += " Last problems: " + [...last.schema_errors, ...last.violations].slice(0, 3).join("; ");
+      if (d.errors) detail += " " + d.errors.slice(0, 3).join("; ");
+    } else detail = JSON.stringify(body);
+  } catch (e) { detail = res.statusText; }
+  return `HTTP ${res.status}: ${detail}`;
+}
+
+function escapeHtml(t) {
+  return String(t).replace(/[&<>"']/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[ch]));
+}
+
+// Backend Health Check
+async function checkBackendHealth() {
+  const pill = $("#status-pill");
+  try {
+    const res = await fetch(API_BASE + "/api/health");
+    if (!res.ok) throw new Error("Status " + res.status);
+    const data = await res.json();
+    pill.classList.remove("error");
+    pill.classList.add("connected");
+    pill.innerHTML = `<b></b>Connected · ${(data.stats?.total_components ?? 0).toLocaleString()} parts with facts`;
+    const llmInfo = data.llm || {};
+    const llmText = llmInfo.configured ? `${llmInfo.model} (${llmInfo.runs_locally ? 'local' : llmInfo.provider})` : 'Nemotron not configured';
+    const idx = data.symbol_index || {};
+    let symText = data.symbols_ready ? 'KiCad symbols ready' : 'KiCad symbols missing';
+    if (data.symbols_ready && idx.state && !idx.ready && !idx.error) {
+      symText = `indexing KiCad library ${Math.round((idx.progress || 0) * 100)}%`;
+    }
+    $("#backend-status-hint").textContent = `v${data.version} · ${llmText} · ${symText}`;
+  } catch (err) {
+    pill.classList.remove("connected");
+    pill.classList.add("error");
+    pill.innerHTML = `<b></b>Backend Disconnected`;
+    $("#backend-status-hint").textContent = "Backend offline (connect on :8000)";
+  }
+}
+checkBackendHealth();
+setInterval(checkBackendHealth, 12000);
+
+// Generation runs as a background job on the server; poll it so the UI can show the current stage.
+const JOB_POLL_MS = 1500;
+const STAGE_LABELS = { queued: "Waiting for a previous design", starting: "Starting",
+  "planning blocks": "Planning blocks", "searching KiCad library": "Searching KiCad library",
+  checking: "Checking", "writing schematic": "Writing schematic", done: "Done" };
+
+function stageLabel(stage) {
+  stage = stage || "starting";
+  const round = /^designing netlist, round (\d+)/.exec(stage);
+  if (round) return round[1] === "1" ? "Designing netlist" : `Repairing netlist (round ${round[1]})`;
+  return STAGE_LABELS[stage] || stage;
+}
+
+// Map a server stage onto the 5-step indicator: Understand, Plan, Verify, Synthesize, Deliver
+function flowForStage(stage) {
+  let i = 0;
+  if (/^designing netlist/.test(stage || "")) i = 1;
+  else if (stage === "checking") i = 2;
+  else if (stage === "writing schematic") i = 3;
+  else if (stage === "done") i = 4;
+  return STEPS.map((_, k) => k < i ? "done" : k === i ? "prog" : "pend");
+}
+
+async function runGenerationJob(body, onProgress) {
+  const res = await fetch(API_BASE + "/api/generate-jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (res.status === 404 || res.status === 405) {  // older backend without the job API
+    const legacy = await fetch(API_BASE + "/api/generate-from-prompt", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+    });
+    if (!legacy.ok) throw new Error(await apiError(legacy));
+    return legacy.json();
+  }
+  if (!res.ok) throw new Error(await apiError(res));
+  let job = await res.json();
+  let misses = 0;
+  while (true) {
+    onProgress(job.stage, job.elapsed_s || 0);
+    if (job.status === "done") return job.result;
+    if (job.status === "error") {
+      const err = job.error || {};
+      // Reuse apiError so job failures read exactly like the old endpoint's errors
+      throw new Error(await apiError(new Response(JSON.stringify({ detail: err.detail }), { status: err.status_code || 500 })));
+    }
+    await new Promise(r => setTimeout(r, JOB_POLL_MS));
+    try {
+      const poll = await fetch(API_BASE + "/api/generate-jobs/" + encodeURIComponent(job.job_id));
+      if (!poll.ok) throw new Error(await apiError(poll));
+      job = await poll.json();
+      misses = 0;
+    } catch (err) {
+      if (++misses >= 5) throw err;  // tolerate brief hiccups, give up after ~7 s of failed polls
+    }
+  }
+}
+
+// Generate Design Action (Form validation & error states)
+async function triggerGenerate() {
+  const promptInput = $("#prompt");
+  const promptVal = promptInput.value.trim();
+  const errorMsg = $("#prompt-error");
+
+  if (!promptVal) {
+    promptInput.classList.add("input-error");
+    errorMsg.classList.add("visible");
+    showToast("Validation Error: Please provide a circuit requirement.", "error");
+    promptInput.focus();
+    return;
+  }
+
+  promptInput.classList.remove("input-error");
+  errorMsg.classList.remove("visible");
+
+  const btn = $("#gen");
+  btn.disabled = true;
+  btn.innerHTML = `<span>Starting... <span class="dot">●</span></span>`;
+  $("#req-text").textContent = promptVal;
+
+  updateFlow(["prog", "pend", "pend", "pend", "pend"]);
+
+  try {
+    const data = await runGenerationJob({
+      user_prompt: promptVal,
+      project_name: "circuitproof_generated",
+      max_repair_rounds: 5   // rounds take ~10-20 s now; the server's time budget still caps the total
+    }, (stage, elapsed) => {
+      btn.innerHTML = `<span>${escapeHtml(stageLabel(stage))} · ${Math.round(elapsed)}s <span class="dot">●</span></span>`;
+      updateFlow(flowForStage(stage));
+    });
+    updateFlow(["done", "done", "done", "done", "prog"]);
+
+    // Update current state
+    currentDesign.projectName = data.generated_file.replace(".kicad_sch", "");
+    currentDesign.findings = data.findings || [];
+    currentDesign.schematicContent = data.schematic_content || "";
+    currentDesign.reportContent = data.report_content || "";
+
+    if (data.components && data.components.length > 0) {
+      currentDesign.components = layoutComponentsGrid(data.components);
+    }
+    if (data.nets) {
+      currentDesign.nets = data.nets;
+    }
+
+    $("#ai-explanation").innerHTML = escapeHtml(data.explanation || "Design extracted and checked.")
+      .replace(/\n\n/g, "<br><br>");
+
+    $("#art-sch-name").textContent = data.generated_file;
+    $("#art-rep-name").textContent = data.generated_report;
+
+    updateFlow(["done", "done", "done", "done", "done"]);
+
+    // Redraw Canvas & Panels
+    renderCanvas();
+    renderInspector();
+    renderBottomPanel();
+    renderVerification();
+
+    // Show Thank-You / Success Dialog
+    $("#ty-sch-name").textContent = data.generated_file;
+    $("#ty-rep-name").textContent = data.generated_report;
+    const cnt = k => currentDesign.findings.filter(f => f.res === k).length;
+    $("#ty-find-count").textContent = `${currentDesign.findings.length} findings: ${cnt("FAIL")} fail, ${cnt("WARNING")} warning, ${cnt("NE")} not evaluated, ${cnt("PASS")} pass`;
+    $("#ty-title").textContent = data.status === "verified" ? "Schematic generated and accepted by the referee" : "Schematic generated: needs review";
+    $("#ty-text").textContent = data.status === "verified"
+      ? `Nemotron's design passed every rule the referee could check (${data.repair_history.length} round(s)). Items marked NOT EVALUATED lack datasheet data.`
+      : "The referee still reports problems after the repair rounds. Check the Verification Center before using this design.";
+    $("#thankyou-modal").classList.add("open");
+
+    showToast(data.status === "verified" ? "Design accepted by the referee" : "Design generated with open findings", data.status === "verified" ? "success" : "error");
+    trackEvent("synthesis_success", { components: currentDesign.components.length });
+
+  } catch (err) {
+    console.error("Synthesis error:", err);
+    showToast("Synthesis failed: " + err.message, "error");
+    updateFlow(["pend", "pend", "pend", "pend", "pend"]);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<span>Generate Design →</span>`;
+  }
+}
+
+$("#gen").onclick = triggerGenerate;
+$("#mobile-gen-btn").onclick = () => {
+  switchView("studio", "AI Design Studio", $("#nav button"));
+  triggerGenerate();
+};
+
+// Thank-You Modal Events
+$("#ty-close-btn").onclick = () => $("#thankyou-modal").classList.remove("open");
+$("#ty-dl-all-btn").onclick = () => {
+  downloadFile(currentDesign.projectName + ".kicad_sch", currentDesign.schematicContent);
+  $("#thankyou-modal").classList.remove("open");
+  showToast("KiCad schematic downloaded!", "success");
+};
+
+// Automatic 2D Layout for Extracted Components
+function layoutComponentsGrid(rawComps) {
+  const startX = 60, startY = 60, colW = 180, rowH = 150;
+  const cols = 3;
+  return rawComps.map((c, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const ref = c.reference || `U${i + 1}`;
+    const lib = c.lib_id || "";
+    const isPassive = ref.startsWith("R") || ref.startsWith("C");
+    return {
+      reference: ref,
+      lib_id: lib,
+      part: c.part || lib.split(":").pop() || ref,
+      category: c.category || (ref.startsWith("R") ? "Resistor" : ref.startsWith("C") ? "Capacitor" : "IC"),
+      x: startX + (col * colW),
+      y: startY + (row * rowH),
+      w: isPassive ? 80 : 130,
+      h: isPassive ? 60 : 110,
+      pins: c.pins || ["1", "2"]
+    };
+  });
+}
+
+// Reset New Design
+$("#newd").onclick = () => {
+  $("#prompt").value = "";
+  $("#prompt").classList.remove("input-error");
+  $("#prompt-error").classList.remove("visible");
+  $("#cc").textContent = "0/600";
+  updateFlow(["pend", "pend", "pend", "pend", "pend"]);
+  $("#req-text").textContent = "Awaiting requirements prompt...";
+  $("#ai-explanation").textContent = "Type an electrical requirement above and click Generate Design.";
+  showToast("Ready for new design prompt");
+};
+
+// Artifact Downloads
+$("#dl-sch-btn").onclick = () => downloadFile(currentDesign.projectName + ".kicad_sch", currentDesign.schematicContent || "KiCad S-Expression Content");
+$("#dl-rep-btn").onclick = () => downloadFile(currentDesign.projectName + "_audit_report.md", currentDesign.reportContent || "CircuitProof Audit Report");
+$("#dl-cur-sch-btn").onclick = () => downloadFile(currentDesign.projectName + ".kicad_sch", currentDesign.schematicContent);
+$("#dl-cur-rep-btn").onclick = () => downloadFile(currentDesign.projectName + "_audit_report.md", currentDesign.reportContent);
+
+function downloadFile(filename, text) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  showToast(`Downloaded: ${filename}`, "success");
+}
+
+// -------------------------------------------------------------
+// Interactive Schematic SVG Canvas
+// -------------------------------------------------------------
+const svg = $("#svg");
+
+function renderCanvas() {
+  const elements = [
+    `<defs>
+      <pattern id="gridPattern" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M20 0H0V20" fill="none" stroke="#C5CBD6" stroke-width=".5"/>
+      </pattern>
+    </defs>`
+  ];
+
+  if (showOptions.grid) {
+    elements.push(`<rect x="-2000" y="-2000" width="5000" height="5000" fill="url(#gridPattern)"/>`);
+  }
+
+  // Draw Title Block
+  elements.push(`
+    <g font-family="monospace" font-size="8" fill="#444">
+      <rect x="420" y="300" width="160" height="46" fill="#FFFFFFDD" stroke="#444"/>
+      <line x1="420" y1="316" x2="580" y2="316" stroke="#444"/>
+      <text x="426" y="311" font-size="9" font-weight="700">CIRCUITPROOF · A4 SYNTH</text>
+      <text x="426" y="328">SHEET 1/1 · REV A</text>
+      <text x="426" y="339">${currentDesign.projectName.toUpperCase()}</text>
+    </g>
+  `);
+
+  const compCoords = {};
+  currentDesign.components.forEach(c => {
+    compCoords[c.reference] = c;
+  });
+
+  // Draw Nets & Auto-routed Wires
+  if (showOptions.wires && currentDesign.nets) {
+    currentDesign.nets.forEach(n => {
+      const netName = n.net;
+      const conns = n.connections || [];
+      const isSelected = selectedCompRef && conns.some(cn => cn[0] === selectedCompRef);
+      const wireStroke = isSelected ? "#2B6BFF" : "#1F6F4A";
+      const strokeW = isSelected ? 2.5 : 1.4;
+
+      if (conns.length >= 2) {
+        const c1 = compCoords[conns[0][0]];
+        const c2 = compCoords[conns[1][0]];
+        if (c1 && c2) {
+          const x1 = c1.x + c1.w;
+          const y1 = c1.y + 25;
+          const x2 = c2.x;
+          const y2 = c2.y + 25;
+          const midX = (x1 + x2) / 2;
+
+          elements.push(`
+            <path d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" 
+                  fill="none" stroke="${wireStroke}" stroke-width="${strokeW}" class="${isSelected ? 'wf' : ''}"/>
+            <circle cx="${x1}" cy="${y1}" r="3" fill="#1F6F4A"/>
+            <circle cx="${x2}" cy="${y2}" r="3" fill="#1F6F4A"/>
+          `);
+
+          if (showOptions.nets) {
+            elements.push(`
+              <text x="${midX + 3}" y="${(y1 + y2) / 2 - 4}" font-size="8" fill="#1F6F4A" font-family="monospace">${netName}</text>
+            `);
+          }
+        }
+      }
+    });
+  }
+
+  // Draw Components
+  currentDesign.components.forEach(c => {
+    const isSelected = selectedCompRef === c.reference;
+    const strokeColor = isSelected ? "#2B6BFF" : "#7A5C00";
+    const strokeW = isSelected ? 2.5 : 1.5;
+    const hasFail = currentDesign.findings.some(f => (f.res === "FAIL" || f.res === "INC") && f.ref && f.ref.includes(c.reference));
+
+    elements.push(`
+      <g data-ref="${c.reference}" style="cursor:pointer" role="img" aria-label="Component ${c.reference} (${c.part})">
+        <rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" 
+              fill="#FFFDF0" stroke="${strokeColor}" stroke-width="${strokeW}" rx="3"/>
+        ${hasFail ? `<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" fill="none" stroke="#DC2626" stroke-dasharray="4 3" stroke-width="1.5" rx="3"/>` : ''}
+        ${showOptions.refs ? `<text x="${c.x + 8}" y="${c.y + 16}" font-size="12" font-weight="700" font-family="monospace" fill="#111">${c.reference}</text>` : ''}
+        <text x="${c.x + 8}" y="${c.y + c.h - 8}" font-size="9" font-family="monospace" fill="#555">${c.part}</text>
+      </g>
+    `);
+  });
+
+  svg.innerHTML = elements.join("");
+  svg.setAttribute("viewBox", `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+
+  svg.querySelectorAll("[data-ref]").forEach(g => {
+    g.onclick = e => {
+      e.stopPropagation();
+      selectComponent(g.dataset.ref);
+    };
+  });
+}
+
+function selectComponent(ref) {
+  selectedCompRef = (selectedCompRef === ref) ? null : ref;
+  renderCanvas();
+  renderInspector();
+  renderBottomPanel();
+}
+
+// Canvas Zoom & Pan Controls
+function zoomCanvas(factor) {
+  const cx = viewBox.x + viewBox.w / 2;
+  const cy = viewBox.y + viewBox.h / 2;
+  viewBox.w *= factor;
+  viewBox.h *= factor;
+  viewBox.x = cx - viewBox.w / 2;
+  viewBox.y = cy - viewBox.h / 2;
+  renderCanvas();
+}
+$("#zi").onclick = () => zoomCanvas(0.85);
+$("#zo").onclick = () => zoomCanvas(1.2);
+$("#fit").onclick = $("#rs").onclick = () => {
+  viewBox = { x: 0, y: 0, w: 600, h: 360 };
+  renderCanvas();
+};
+
+[["tg", "grid"], ["tn", "nets"], ["tr", "refs"], ["tw", "wires"]].forEach(([btnId, optKey]) => {
+  $("#" + btnId).onclick = e => {
+    showOptions[optKey] ^= 1;
+    e.target.classList.toggle("on");
+    renderCanvas();
+  };
+});
+
+let isDragging = null;
+svg.onpointerdown = e => {
+  isDragging = { x: e.clientX, y: e.clientY, vx: viewBox.x, vy: viewBox.y };
+  svg.setPointerCapture(e.pointerId);
+};
+svg.onpointermove = e => {
+  if (!isDragging) return;
+  const scale = viewBox.w / svg.clientWidth;
+  viewBox.x = isDragging.vx - (e.clientX - isDragging.x) * scale;
+  viewBox.y = isDragging.vy - (e.clientY - isDragging.y) * scale;
+  renderCanvas();
+};
+svg.onpointerup = () => isDragging = null;
+svg.onwheel = e => {
+  e.preventDefault();
+  zoomCanvas(e.deltaY > 0 ? 1.1 : 0.9);
+};
+
+// -------------------------------------------------------------
+// Inspector Panel
+// -------------------------------------------------------------
+function renderInspector() {
+  const el = $("#insp");
+  if (!selectedCompRef) {
+    el.innerHTML = `
+      <h4 style="margin:0 0 10px;font-size:13px">Design Summary</h4>
+      <dl class="kv">
+        <dt>Components</dt><dd>${currentDesign.components.length}</dd>
+        <dt>Routed Nets</dt><dd>${currentDesign.nets.length}</dd>
+        <dt>Rule Checks</dt><dd>${currentDesign.findings.length} (${currentDesign.findings.filter(f => f.res === "PASS").length} passed)</dd>
+        <dt>Standard</dt><dd>KiCad 7/8 A4 Sheet</dd>
+      </dl>
+      <p class="mut" style="margin-top:12px;font-size:11px">Click any component on the schematic canvas or bottom table to inspect electrical limits, rails, and pinouts.</p>
+    `;
+    return;
+  }
+
+  const comp = currentDesign.components.find(c => c.reference === selectedCompRef);
+  if (!comp) return;
+
+  const linkedFindings = currentDesign.findings.filter(f => f.ref && f.ref.includes(comp.reference));
+
+  el.innerHTML = `
+    <h4 style="margin:0 0 8px">${comp.reference} <span class="mut mono" style="font-size:11px">(${comp.part})</span></h4>
+    <dl class="kv">
+      <dt>Library ID</dt><dd>${comp.lib_id}</dd>
+      <dt>Category</dt><dd>${comp.category}</dd>
+      <dt>Coordinates</dt><dd>X: ${comp.x.toFixed(1)}, Y: ${comp.y.toFixed(1)}</dd>
+      <dt>Dimensions</dt><dd>${comp.w} x ${comp.h} mm</dd>
+      <dt>Pins Listed</dt><dd>${(comp.pins || []).join(", ") || 'N/A'}</dd>
+    </dl>
+    <h5 class="mut" style="margin:14px 0 6px;font-size:10px;letter-spacing:.08em">LINKED REFEREE FINDINGS</h5>
+    ${linkedFindings.length ? linkedFindings.map(f => `
+      <div style="margin-bottom:6px">
+        ${stBadge(f.res)} <span class="mono" style="font-size:11px">${f.rule}</span>
+      </div>
+    `).join("") : '<div class="mut mono" style="font-size:11px">No direct rule violations found.</div>'}
+  `;
+}
+
+// -------------------------------------------------------------
+// Bottom Data Panels
+// -------------------------------------------------------------
+const BOTTOM_TABS = ["Components", "Nets", "Power Rails", "Findings", "Raw JSON"];
+$("#btabs").innerHTML = BOTTOM_TABS.map(t => `<button class="tab ${t === bottomTab ? 'on' : ''}" data-tab="${t}">${t}</button>`).join("");
+$("#btabs").onclick = e => {
+  if (e.target.dataset.tab) {
+    bottomTab = e.target.dataset.tab;
+    renderBottomPanel();
+  }
+};
+
+function renderBottomPanel() {
+  document.querySelectorAll("#btabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === bottomTab));
+  let html = "";
+
+  if (bottomTab === "Components") {
+    html = `
+      <table>
+        <tr><th>Ref</th><th>Part Description</th><th>Category</th><th>Library ID</th><th>Position (X,Y)</th></tr>
+        ${currentDesign.components.map(c => `
+          <tr class="row ${selectedCompRef === c.reference ? 'sel' : ''}" data-ref="${c.reference}">
+            <td><b>${c.reference}</b></td>
+            <td>${c.part}</td>
+            <td>${c.category}</td>
+            <td>${c.lib_id}</td>
+            <td>(${c.x.toFixed(0)}, ${c.y.toFixed(0)})</td>
+          </tr>
+        `).join("")}
+      </table>
+    `;
+  } else if (bottomTab === "Nets") {
+    html = `
+      <table>
+        <tr><th>Net Name</th><th>Connected Components &amp; Pins</th></tr>
+        ${currentDesign.nets.map(n => `
+          <tr>
+            <td><b style="color:var(--cyan)">${n.net}</b></td>
+            <td>${(n.connections || []).map(cn => `${cn[0]}:${cn[1]}`).join("  ↔  ")}</td>
+          </tr>
+        `).join("")}
+      </table>
+    `;
+  } else if (bottomTab === "Power Rails") {
+    html = `
+      <table>
+        <tr><th>Rail Identifier</th><th>Nominal Voltage</th><th>Target Consumers</th></tr>
+        <tr><td><b style="color:var(--bad)">3V3</b></td><td>3.3 V DC</td><td>U1 (MCU), U2 (Sensor), U3 (Flash)</td></tr>
+        <tr><td><b style="color:var(--ok)">GND</b></td><td>0.0 V (Ground Return)</td><td>U1, U2, U3, Bypass Caps</td></tr>
+      </table>
+    `;
+  } else if (bottomTab === "Findings") {
+    html = renderFindingsTable();
+  } else if (bottomTab === "Raw JSON") {
+    html = `<pre class="mono" style="margin:0;padding:12px;font-size:11px;color:var(--tx2)">${JSON.stringify({
+      components: currentDesign.components,
+      nets: currentDesign.nets,
+      findings: currentDesign.findings
+    }, null, 2)}</pre>`;
+  }
+
+  $("#bbody").innerHTML = html;
+  $("#bbody").querySelectorAll("tr.row[data-ref]").forEach(r => {
+    r.onclick = () => selectComponent(r.dataset.ref);
+  });
+}
+
+function renderFindingsTable() {
+  if (!currentDesign.findings.length) {
+    return `<div class="empty">No findings recorded. Click "Generate Design" or "Run Audit" to execute referee rules.</div>`;
+  }
+  return `
+    <table>
+      <tr><th>ID &amp; Rule</th><th>Severity</th><th>Components</th><th>Finding</th><th>Recommended Fix</th><th>Status</th></tr>
+      ${currentDesign.findings.map(f => `
+        <tr class="row ${selectedFindingId === f.id ? 'sel' : ''}" data-fid="${f.id}">
+          <td><b>${f.id}</b> · ${f.rule}</td>
+          <td>${f.sev}</td>
+          <td>${escapeHtml(f.aff)}</td>
+          <td>${escapeHtml(f.message)}</td>
+          <td>${escapeHtml(f.fix)}</td>
+          <td>${stBadge(f.res)}</td>
+        </tr>
+      `).join("")}
+    </table>
+  `;
+}
+
+// -------------------------------------------------------------
+// Verification Center View
+// -------------------------------------------------------------
+function renderVerification() {
+  const fList = currentDesign.findings;
+  const count = k => fList.filter(f => f.res === k).length;
+
+  $("#bar").innerHTML = fList.map(f => {
+    const col = { PASS: 'ok', FAIL: 'bad', WARNING: 'warn', MANUAL: 'warn', INC: 'vio', NE: 'tx2' }[f.res] || 'tx2';
+    return `<i style="background:var(--${col})"></i>`;
+  }).join("");
+
+  $("#chips").innerHTML = ["PASS", "FAIL", "WARNING", "INC", "MANUAL", "NE"].map(k => `
+    <div class="chip">${stBadge(k)}<b>${count(k)}</b></div>
+  `).join("");
+
+  $("#ftab").innerHTML = renderFindingsTable();
+  $("#ftab").onclick = e => {
+    const r = e.target.closest("[data-fid]");
+    if (r) {
+      selectedFindingId = r.dataset.fid;
+      renderVerification();
+      renderFindingDetail();
+    }
+  };
+  renderFindingDetail();
+}
+
+function renderFindingDetail() {
+  const f = currentDesign.findings.find(x => x.id === selectedFindingId);
+  if (!f) {
+    $("#fdet").innerHTML = `<span class="mut">Select a finding row above to inspect engineering rule constraints and recommended remedies.</span>`;
+    return;
+  }
+  $("#fdet").innerHTML = `
+    <h4 style="margin:0 0 10px">${f.id} · ${f.rule}</h4>
+    ${stBadge(f.res)}
+    <dl class="kv" style="margin-top:12px">
+      <dt>Finding</dt><dd>${escapeHtml(f.message)}</dd>
+      <dt>Severity</dt><dd>${f.sev}</dd>
+      <dt>Data Source</dt><dd>${f.data}</dd>
+      <dt>Recommended Fix</dt><dd style="color:var(--cyan)">${escapeHtml(f.fix)}</dd>
+      <dt>Components Involved</dt><dd>${(f.ref || []).join(", ")}</dd>
+    </dl>
+  `;
+}
+
+$("#reverify-btn").onclick = async () => {
+  try {
+    const res = await fetch(API_BASE + "/api/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        components: currentDesign.components,
+        nets: currentDesign.nets
+      })
+    });
+    if (!res.ok) throw new Error(await apiError(res));
+    const data = await res.json();
+    currentDesign.findings = data.findings || [];
+    renderVerification();
+    renderBottomPanel();
+    showToast(`Audit complete: ${currentDesign.findings.length} rules checked.`, "success");
+    trackEvent("audit_run_manual");
+  } catch (err) {
+    showToast("Verification failed: " + err.message, "error");
+  }
+};
+
+// -------------------------------------------------------------
+// Component Library View (with Skeletons)
+// -------------------------------------------------------------
+let compOffset = 0;
+const COMP_LIMIT = 40;
+
+async function loadComponents(offset = 0) {
+  compOffset = offset;
+  const searchVal = $("#comp-search").value.trim();
+  const catVal = $("#comp-cat-select").value;
+  
+  // Skeleton Loading State
+  $("#comp-table-wrap").innerHTML = `
+    <div style="padding:16px">
+      <div class="skeleton" style="width:100%"></div>
+      <div class="skeleton" style="width:85%"></div>
+      <div class="skeleton" style="width:92%"></div>
+      <div class="skeleton" style="width:78%"></div>
+      <div class="skeleton" style="width:95%"></div>
+    </div>
+  `;
+
+  try {
+    const params = new URLSearchParams({
+      limit: COMP_LIMIT,
+      offset: compOffset,
+      search: searchVal,
+      category: catVal
+    });
+    const res = await fetch(API_BASE + "/api/components?" + params.toString());
+    const data = await res.json();
+
+    $("#comp-count-pill").innerHTML = `<b></b>Total in DB: ${data.total.toLocaleString()} components`;
+    $("#comp-page-info").innerHTML = `Showing ${compOffset + 1} - ${Math.min(compOffset + COMP_LIMIT, data.total)} of ${data.total.toLocaleString()} &nbsp; 
+      <button class="btn-secondary" id="comp-prev" ${compOffset <= 0 ? 'disabled' : ''}>← Prev</button> 
+      <button class="btn-secondary" id="comp-next" ${compOffset + COMP_LIMIT >= data.total ? 'disabled' : ''}>Next →</button>`;
+
+    if (!data.components.length) {
+      $("#comp-table-wrap").innerHTML = `<div class="empty">No components matched query.</div>`;
+      return;
+    }
+
+    $("#comp-table-wrap").innerHTML = `
+      <table>
+        <tr><th>Component ID</th><th>Category</th><th>Verified</th><th>Electrical Specifications (JSON)</th></tr>
+        ${data.components.map(c => `
+          <tr>
+            <td><b style="color:var(--cyan)">${c.component_id}</b></td>
+            <td>${c.category || 'N/A'}</td>
+            <td>${c.verified ? '<span class="st PASS">VERIFIED</span>' : '<span class="st NE">UNVERIFIED</span>'}</td>
+            <td style="font-size:10px;color:var(--tx2);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${JSON.stringify(c.facts)}</td>
+          </tr>
+        `).join("")}
+      </table>
+    `;
+
+    $("#comp-prev").onclick = () => loadComponents(Math.max(0, compOffset - COMP_LIMIT));
+    $("#comp-next").onclick = () => loadComponents(compOffset + COMP_LIMIT);
+
+  } catch (err) {
+    $("#comp-table-wrap").innerHTML = `<div class="empty" style="color:var(--bad)">Error fetching components: ${err.message}</div>`;
+  }
+}
+
+// Load Categories dropdown
+async function loadCategories() {
+  try {
+    const res = await fetch(API_BASE + "/api/components/categories");
+    const data = await res.json();
+    const select = $("#comp-cat-select");
+    select.innerHTML = `<option value="">All Categories</option>` +
+      (data.categories || []).map(cat => `<option value="${cat}">${cat}</option>`).join("");
+  } catch (e) {}
+}
+loadCategories();
+
+$("#comp-search-btn").onclick = () => loadComponents(0);
+$("#comp-search").onkeydown = e => { if (e.key === "Enter") loadComponents(0); };
+$("#comp-cat-select").onchange = () => loadComponents(0);
+
+// -------------------------------------------------------------
+// Design Recipes View
+// -------------------------------------------------------------
+async function loadRecipes() {
+  const wrap = $("#recipes-list");
+  wrap.innerHTML = `<div style="padding:16px"><div class="skeleton"></div><div class="skeleton" style="width:70%"></div></div>`;
+  try {
+    const res = await fetch(API_BASE + "/api/recipes");
+    const data = await res.json();
+    if (!data.recipes || !data.recipes.length) {
+      wrap.innerHTML = `<div class="empty">No design recipes stored yet.</div>`;
+      return;
+    }
+    wrap.innerHTML = data.recipes.map(r => `
+      <div class="card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span class="st PASS">${r.interface_type || 'INTERFACE'}</span>
+          <span class="mono mut" style="font-size:11px">Recipe #${r.recipe_id}</span>
+        </div>
+        <h4 style="margin:0 0 6px">${r.design_summary || 'Standard Connection Recipe'}</h4>
+        <pre class="mono" style="margin:0;padding:8px;background:var(--bg);border-radius:4px;font-size:11px;overflow:auto">${JSON.stringify(r.circuit, null, 2)}</pre>
+      </div>
+    `).join("");
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty" style="color:var(--bad)">Error loading recipes: ${err.message}</div>`;
+  }
+}
+
+// -------------------------------------------------------------
+// Knowledge & Mistakes View (with Form Validation)
+// -------------------------------------------------------------
+async function loadMistakes() {
+  const wrap = $("#mistakes-list");
+  wrap.innerHTML = `<div style="padding:16px"><div class="skeleton"></div><div class="skeleton" style="width:60%"></div></div>`;
+  try {
+    const res = await fetch(API_BASE + "/api/mistakes");
+    const data = await res.json();
+    if (!data.mistakes || !data.mistakes.length) {
+      wrap.innerHTML = `<div class="empty">No past design mistakes recorded yet.</div>`;
+      return;
+    }
+    wrap.innerHTML = `
+      <table>
+        <tr><th>ID</th><th>Observed Violation</th><th>Engineering Fix</th><th>Count</th></tr>
+        ${data.mistakes.map(m => `
+          <tr>
+            <td>#${m.id}</td>
+            <td style="color:var(--bad)">${m.violation_text}</td>
+            <td style="color:var(--ok)">${m.fix_text}</td>
+            <td><b>${m.occurrence_count}</b></td>
+          </tr>
+        `).join("")}
+      </table>
+    `;
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty" style="color:var(--bad)">Error: ${err.message}</div>`;
+  }
+}
+
+$("#save-mistake-btn").onclick = async () => {
+  const violInput = $("#new-violation");
+  const fixInput = $("#new-fix");
+  const viol = violInput.value.trim();
+  const fix = fixInput.value.trim();
+  let hasError = false;
+
+  if (!viol) {
+    violInput.classList.add("input-error");
+    $("#mistake-viol-error").classList.add("visible");
+    hasError = true;
+  } else {
+    violInput.classList.remove("input-error");
+    $("#mistake-viol-error").classList.remove("visible");
+  }
+
+  if (!fix) {
+    fixInput.classList.add("input-error");
+    $("#mistake-fix-error").classList.add("visible");
+    hasError = true;
+  } else {
+    fixInput.classList.remove("input-error");
+    $("#mistake-fix-error").classList.remove("visible");
+  }
+
+  if (hasError) return;
+
+  try {
+    const res = await fetch(API_BASE + "/api/mistakes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ violation_text: viol, fix_text: fix })
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    showToast("Rule successfully recorded in SQLite mistake memory!", "success");
+    violInput.value = "";
+    fixInput.value = "";
+    loadMistakes();
+  } catch (err) {
+    showToast("Error saving mistake: " + err.message, "error");
+  }
+};
+
+// -------------------------------------------------------------
+// Project Scanner View
+// -------------------------------------------------------------
+$("#run-scan-btn").onclick = async () => {
+  const dirInput = $("#scan-dir-input");
+  const dir = dirInput.value.trim() || ".";
+  const wrap = $("#scan-results-wrap");
+  wrap.innerHTML = `<div class="empty">Scanning directory and parsing S-expressions... <span class="dot">●</span></div>`;
+
+  try {
+    const res = await fetch(API_BASE + "/api/scan-directory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ directory: dir })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+
+    wrap.innerHTML = `
+      <div class="card" style="margin-bottom:10px">
+        <h4 style="margin:0 0 6px">Scan Complete</h4>
+        <dl class="kv">
+          <dt>Directory</dt><dd>${data.scanned_directory}</dd>
+          <dt>Schematics Found</dt><dd>${data.schematic_files_found}</dd>
+          <dt>Components Cataloged</dt><dd>${data.total_components_cataloged}</dd>
+        </dl>
+      </div>
+      <table>
+        <tr><th>Schematic Path</th><th>Components Parsed</th></tr>
+        ${data.files.map(f => `
+          <tr>
+            <td><b style="color:var(--cyan)">${f.path}</b></td>
+            <td>${f.components_extracted} parts</td>
+          </tr>
+        `).join("")}
+      </table>
+    `;
+    checkBackendHealth();
+    showToast(`Scan complete: ${data.total_components_cataloged} components cataloged`, "success");
+    trackEvent("project_scan_executed", { schematics: data.schematic_files_found });
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty" style="color:var(--bad)">Scan failed: ${err.message}</div>`;
+    showToast("Scan error: " + err.message, "error");
+  }
+};
+
+// -------------------------------------------------------------
+// Report View
+// -------------------------------------------------------------
+function renderReportView() {
+  const el = $("#report-view-wrap");
+  if (currentDesign.reportContent) {
+    el.textContent = currentDesign.reportContent;
+  } else {
+    el.textContent = "# CircuitProof Engineering Audit Report\n\nNo report generated yet. Run 'Generate Design' in the studio to compile an audit.";
+  }
+}
+
+// -------------------------------------------------------------
+// Schematic S-Expression View
+// -------------------------------------------------------------
+function renderSchematicCode() {
+  const el = $("#raw-sch-code");
+  if (currentDesign.schematicContent) {
+    el.textContent = currentDesign.schematicContent;
+  } else {
+    el.textContent = "(kicad_sch (version 20230121) (generator \"CircuitProof-Bounded-Engine\")\n  (paper \"A4\")\n  ;; No schematic synthesized yet. Generate a design in Studio first.\n)";
+  }
+}
+
+// Command Palette (Ctrl+K)
+$("#cmdk").onclick = () => {
+  const choice = prompt("Go to:\n1. studio (AI Design Studio)\n2. verify (Verification Center)\n3. components (Library)\n4. recipes (Interface Recipes)\n5. mistakes (Mistake Memory)\n6. scanner (Project Scanner)\n7. reports (Audit Reports)\n8. schematic (KiCad S-Exp)\n9. contact (Lab Contact)");
+  if (!choice) return;
+  const key = choice.toLowerCase().trim();
+  if (key === "1" || key === "studio") switchView("studio", "AI Design Studio");
+  else if (key === "2" || key === "verify") switchView("verify", "Verification Center");
+  else if (key === "3" || key === "components") switchView("components-view", "Component Library");
+  else if (key === "4" || key === "recipes") switchView("recipes-view", "Design Recipes");
+  else if (key === "5" || key === "mistakes") switchView("mistakes-view", "Knowledge & Mistakes");
+  else if (key === "6" || key === "scanner") switchView("scanner-view", "Project Scanner");
+  else if (key === "7" || key === "reports") switchView("reports-view", "Audit Reports");
+  else if (key === "8" || key === "schematic") switchView("schematic-view", "Schematic Workspace");
+  else if (key === "9" || key === "contact") window.open("/contact", "_blank");
+};
+addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+    e.preventDefault();
+    $("#cmdk").click();
+  }
+});
+
+// Initial boot
+renderCanvas();
+renderInspector();
+renderBottomPanel();
+renderVerification();
+trackEvent("app_loaded");
+</script>
+</body>
+</html>

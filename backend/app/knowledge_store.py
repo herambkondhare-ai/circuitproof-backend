@@ -19,6 +19,9 @@ still used, but every finding based on them says so.
 
 import json
 import sqlite3
+from pathlib import Path
+
+DEFAULT_DB = str(Path(__file__).resolve().parent.parent / "data" / "circuitproof_knowledge.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS parts (
@@ -51,7 +54,7 @@ CREATE TABLE IF NOT EXISTS mistakes (
 class KnowledgeStore:
     """Opens a short-lived connection per call, so it is safe under FastAPI's thread pool."""
 
-    def __init__(self, db_path="circuitproof_notebook.db"):
+    def __init__(self, db_path=DEFAULT_DB):
         self.db_path = db_path
         conn = sqlite3.connect(self.db_path)
         try:
@@ -89,13 +92,23 @@ class KnowledgeStore:
         self._run("INSERT OR REPLACE INTO lib_map VALUES (?, ?)", (lib_id, part_id))
 
     def resolve(self, lib_id="", value="", part_id=""):
-        """Find facts for a component: explicit part_id, then symbol mapping, then value."""
+        """Find facts for a component: explicit part_id, then symbol mapping, then value,
+        then the stored part whose id the KiCad symbol name starts with (ESP32-WROOM-32E -> ESP32-WROOM-32)."""
         for candidate in (part_id, self._mapped(lib_id), value):
             if candidate:
                 part = self.get_part(candidate)
                 if part:
                     return part
+        symbol = (lib_id or "").split(":")[-1].upper()
+        if len(symbol) >= 5:
+            ids = [r[0] for r in self._run("SELECT part_id FROM parts", fetch=True)]
+            best = max((i for i in ids if len(i) >= 5 and symbol.startswith(i.upper())), key=len, default=None)
+            if best:
+                return self.get_part(best)
         return None
+
+    def has_part(self, part_id):
+        return bool(self._run("SELECT 1 FROM parts WHERE part_id = ? COLLATE NOCASE", (part_id,), fetch=True))
 
     def _mapped(self, lib_id):
         if not lib_id:
@@ -124,6 +137,38 @@ class KnowledgeStore:
         else:
             self._run("INSERT INTO mistakes (violation_text, fix_text, occurrence_count) "
                       "VALUES (?, ?, 1)", (violation_text, fix_text))
+
+    def list_mistakes(self, limit=100):
+        rows = self._run("SELECT id, violation_text, fix_text, occurrence_count FROM mistakes "
+                         "ORDER BY occurrence_count DESC, id DESC LIMIT ?", (limit,), fetch=True)
+        return [{"id": r[0], "violation_text": r[1], "fix_text": r[2], "occurrence_count": r[3]} for r in rows]
+
+    # ---- browsing (component library view)
+    def count_parts(self):
+        return self._run("SELECT COUNT(*) FROM parts", fetch=True)[0][0]
+
+    def categories(self):
+        return [r[0] for r in self._run("SELECT DISTINCT category FROM parts WHERE category IS NOT NULL "
+                                        "ORDER BY category", fetch=True)]
+
+    def list_parts(self, search="", category="", limit=50, offset=0):
+        where, args = [], []
+        if search:
+            where.append("(part_id LIKE ? OR facts_json LIKE ?)")
+            args += [f"%{search}%", f"%{search}%"]
+        if category:
+            where.append("category = ?")
+            args.append(category)
+        clause = (" WHERE " + " AND ".join(where)) if where else ""
+        total = self._run("SELECT COUNT(*) FROM parts" + clause, tuple(args), fetch=True)[0][0]
+        rows = self._run("SELECT part_id, category, facts_json, verified, source FROM parts" + clause +
+                         " ORDER BY part_id LIMIT ? OFFSET ?", tuple(args + [limit, offset]), fetch=True)
+        mapped = {}
+        for lib_id, part_id in self._run("SELECT lib_id, part_id FROM lib_map", fetch=True):
+            mapped.setdefault(part_id, []).append(lib_id)
+        parts = [{"component_id": r[0], "category": r[1], "facts": json.loads(r[2]), "verified": bool(r[3]),
+                  "source": r[4] or "", "kicad_symbols": mapped.get(r[0], [])} for r in rows]
+        return {"total": total, "components": parts}
 
     def close(self):
         """Kept for compatibility; connections are already closed after each call."""

@@ -52,7 +52,9 @@ class ReportExporter:
         if erc is not None:
             L += ["", "## KiCad ERC (kicad-cli)", "", f"Errors: {erc['errors']} · Warnings: {erc['warnings']}", ""]
             for item in erc["items"][:30]:
-                L.append(f"- **{item['severity']}** {_cell(item['type'])}: {_cell(item['description'])}")
+                pins = "; ".join(item.get("pins") or [])
+                L.append(f"- **{item['severity']}** {_cell(item['type'])}: {_cell(item['description'])}"
+                         + (f" ({_cell(pins)})" if pins else ""))
 
         if design is not None:
             L += ["", "## Components", "", "| Ref | Symbol | Value |", "| --- | --- | --- |"]

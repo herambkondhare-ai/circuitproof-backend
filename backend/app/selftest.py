@@ -1,11 +1,16 @@
 """
-Offline self-test (no LLM, no KiCad needed):  python selftest.py
+Offline self-test (no LLM, no KiCad needed):  python backend/app/selftest.py
 Checks the design parser, rail parsing, referee rules, netlist import and report output.
 """
 
 import json
 import os
+import sys
 import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+DEMO = Path(__file__).resolve().parent.parent / "demo"
 
 import load_components
 from circuitproof_core import FAIL, UNVERIFIED, CircuitReferee, parse_ohms, summarize
@@ -57,14 +62,14 @@ def main():
     except DesignError as e:
         check(any("U9" in m for m in e.errors), "unknown component rejected")
 
-    buggy = parse_design(json.load(open("demo/buggy_i2c.json"))["design"])
+    buggy = parse_design(json.load(open(DEMO / "buggy_i2c.json"))["design"])
     f_bug = ref.audit(buggy)
     msgs = " | ".join(f.message for f in f_bug if f.status == FAIL)
     check("no pull-up" in msgs and "I2C_SCL" in msgs, "missing SCL pull-up caught")
     check("5 V" in msgs and "U2" in msgs, "sensor on 5 V rail caught")
     check(summarize(f_bug)["verdict"] == "FAIL", "buggy design verdict FAIL")
 
-    good = parse_design(json.load(open("demo/good_i2c.json"))["design"])
+    good = parse_design(json.load(open(DEMO / "good_i2c.json"))["design"])
     f_good = ref.audit(good)
     check(not [f for f in f_good if f.status == FAIL], "good design has no FAIL")
     check(any(f.status == UNVERIFIED and "max input" in f.message for f in f_good),

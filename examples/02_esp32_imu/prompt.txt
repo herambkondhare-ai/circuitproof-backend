@@ -1,0 +1,1 @@
+ESP32-WROOM-32 with an MPU-6050 IMU on I2C, a push button on IO0 and a status LED, powered from +5V via AMS1117-3.3

@@ -1,0 +1,1 @@
+STM32F103C8 with W25Q128 SPI flash, BME280 on I2C, 8 MHz crystal and two status LEDs
