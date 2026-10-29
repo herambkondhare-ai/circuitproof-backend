@@ -48,6 +48,43 @@ Open `schematic.svg` to view a design in the browser, or `schematic.kicad_sch` i
 - **Honest reports.** Every finding is PASS, FAIL, WARNING or NOT EVALUATED. Missing datasheet data is reported
   as NOT EVALUATED, never guessed; every automatic fix is listed in the repair history.
 
+## How CircuitProof uses NVIDIA Nemotron
+
+CircuitProof's model is **NVIDIA Nemotron**, an open model family from NVIDIA:
+`nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`, called through the **NVIDIA API catalog**
+(`https://integrate.api.nvidia.com/v1`) with an OpenAI-compatible client
+([`backend/app/llm_client.py`](backend/app/llm_client.py)).
+
+Nemotron does the creative part of the job, and deterministic code checks everything it produces:
+
+| Step | What Nemotron does | Code |
+| --- | --- | --- |
+| Block plan | Splits the request into functional blocks (MCU, power, sensor ...) and suggests search terms, e.g. part numbers like `AMS1117-3.3` | `DesignPlanner.plan_blocks` in [`planner.py`](backend/app/planner.py) |
+| Netlist | Chooses parts from the KiCad library candidates and writes components, nets, rails and buses as JSON | `DesignPlanner.run` |
+| Repair rounds | Receives the exact problems found by the referee and KiCad ERC (e.g. *"U3 pin VDD is not connected"*) and returns a corrected design, up to 5 times | `DesignPlanner.run` |
+
+Why the Nano model with reasoning switched off: a design needs several model calls, and a reasoning reply took
+up to ~6 minutes per call in our measurements. With reasoning off (sent as
+`chat_template_kwargs: {"enable_thinking": false}`), a call takes about 10–30 seconds, and the deterministic
+completion and verification steps catch the mistakes that reasoning would otherwise have to avoid. Reasoning can
+be switched back on with `CP_LLM_THINKING=on`.
+
+## Nebius Token Factory
+
+**This submission did not use Nebius Token Factory**: every result above was produced with Nemotron through
+the NVIDIA API catalog. CircuitProof's model client speaks the OpenAI-compatible API, so it can be pointed at
+Token Factory (or any other OpenAI-compatible endpoint) by configuration alone, without code changes:
+
+```
+setx CP_LLM_PROVIDER "custom"
+setx CP_LLM_BASE_URL "<the OpenAI-compatible base URL shown in your Token Factory console>"
+setx CP_LLM_MODEL "<the model id as listed in Token Factory>"
+setx CP_LLM_API_KEY "<your Token Factory API key>"
+```
+
+This path has not been tested. If the endpoint does not accept the reasoning switch, set `CP_LLM_THINKING=on`
+so that it is not sent.
+
 ## Setup (Windows)
 
 1. Install **Python 3.10+** and **KiCad 8 or newer**. KiCad provides the symbol libraries and `kicad-cli`;
@@ -187,3 +224,7 @@ LED and crystal is connected at both ends.
 
 The server prints `[timing]` lines for every stage (model calls, symbol search, referee, ERC), which show where
 the time of a generation goes.
+
+## License
+
+CircuitProof is released under the [MIT License](LICENSE).
