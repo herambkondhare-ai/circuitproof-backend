@@ -20,3 +20,6 @@ backend/data/*.tmp
 backend/exports/*
 !backend/exports/.gitkeep
 backend/app/symbols/
+
+# submission upload, built locally
+CircuitProof_submission.zip

@@ -486,6 +486,7 @@ class SchematicSynthesizer:
         # by a power output (a regulator's VO) gets none: two power outputs on one net is itself an ERC error.
         if add_power_flags:
             rail_nets = [n["net"] for n in nets_list if n["net"] not in driven and n["net"] not in opened
+                         and n.get("connections")  # an empty rail ('+12V' that nothing uses) is not drawn at all
                          and (is_rail(n["net"]) or (n["net"] in powered_in and n["net"] in fed))]
             if rail_nets and not self.lib.has("power:PWR_FLAG"):
                 warnings.append("power:PWR_FLAG symbol not found; KiCad ERC may report undriven power pins")

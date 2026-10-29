@@ -239,7 +239,7 @@ class DesignPlanner:
         blocks = self.plan_blocks(prompt, deadline)
         set_stage("searching KiCad library")
         with timed("symbol search"):
-            found = self.find_candidates(blocks)
+            found = self._prefer_named_chips(prompt, self.find_candidates(blocks))
         fallback = bool(blocks) and blocks[-1].get("search") == [prompt]
         if not fallback:  # cache only real model plans, so a busy model is asked again next time
             with self._cache_lock:
@@ -247,6 +247,34 @@ class DesignPlanner:
                 while len(self._plan_cache) > PLAN_CACHE_SIZE:
                     self._plan_cache.popitem(last=False)
         return [dict(b) for b in blocks], [dict(c) for c in found]
+
+    def _prefer_named_chips(self, prompt, found):
+        """A prompt that names a chip ("ATmega328P") wants that chip, not a development board built around it
+        (Arduino_UNO_R3). Make sure a symbol named after each part number is offered, and drop board modules
+        unless the request asks for a board or module."""
+        tokens = [t for t in PART_TOKEN.findall(prompt) if not NOT_A_PART.match(t)]
+        if not tokens or self.index is None or not self.index.ready:
+            return found
+        known = {e["lib_id"] for e in self.store.catalog() + GENERIC_PARTS}
+        have = {c["lib_id"] for c in found} | known
+        for t in tokens:
+            key = t.lower()
+            if any(lib.split(":")[-1].lower().startswith(key) for lib in have):
+                continue
+            names = sorted((n, i) for i, n in enumerate(self.index.names) if n.startswith(key))
+            for n, i in names[:3]:
+                lib_id = self.index.entries[i]["lib_id"]
+                if self.synth.lib.has(lib_id) and not lib_id.startswith("MCU_Module"):
+                    found.append({"lib_id": lib_id, "part_id": "", "category": "other",
+                                  "desc": self.index.entries[i]["desc"], "block": t})
+                    have.add(lib_id)
+                    break
+        named = any(lib.split(":")[-1].lower().startswith(t.lower()) and not lib.startswith("MCU_Module")
+                    for lib in have for t in tokens)
+        if named and not re.search(r"arduino|\bmodule\b|\bboard\b|\bpico\b|\bnano\b|\buno\b|dev.?kit",
+                                   prompt, re.I):
+            found = [c for c in found if not c["lib_id"].startswith("MCU_Module")]
+        return found
 
     def find_candidates(self, blocks, per_block=PER_BLOCK):
         known = {e["lib_id"] for e in self.store.catalog() + GENERIC_PARTS}
@@ -580,37 +608,45 @@ class DesignPlanner:
         return notes
 
     def _plain_status_leds(self, data):
-        """A multi-colour LED (RGB, several cathodes) picked for an ordinary status LED: use a plain LED, with
-        the anode kept and every cathode connection turned into the one cathode. Not done when RGB was asked."""
+        """A multi-LED package (RGB, dual, bicolour: more than two terminals) picked for an ordinary status LED:
+        use a plain LED, keeping the first anode and the first cathode connection. Not done when the request asks
+        for RGB, dual or bicolour."""
         notes = []
-        if re.search(r"\bRGB\b|multi.?colou?r|bi.?colou?r", getattr(self, "_prompt", "") or "", re.I):
+        if re.search(r"\bRGB\b|multi.?colou?r|bi.?colou?r|\bdual\b|two.?colou?r", getattr(self, "_prompt", "") or "", re.I):
             return notes
         if not self.synth.lib.has("Device:LED"):
             return notes
         for c in [c for c in data["components"] if isinstance(c, dict)]:
             lib = str(c.get("lib_id", ""))
-            if not re.match(r"^Device:LED_(?!Small$|Filled$|Pad$)\w*(RGB|BGR|RG|GB|RB|ABGR|ARGB|RGBA)\w*$", lib, re.I):
+            if not lib.startswith("Device:LED_"):
                 continue
+            try:
+                lib_pins = [p for p in self.synth.lib.get(lib)["pins"] if p["name"].upper() not in ("PAD", "EP")]
+            except SynthesisError:
+                continue
+            if len(lib_pins) <= 2:
+                continue  # an ordinary two-terminal LED in another style (LED_Small, LED_Filled ...)
+            by_key = {p["number"].upper(): p["name"].upper() for p in lib_pins}
+            by_key.update({p["name"].upper(): p["name"].upper() for p in lib_pins})
             ref = str(c.get("reference"))
             c["lib_id"] = "Device:LED"
-            seen_k = set()
+            seen = {"A": False, "K": False}
             for n in data.get("nets") or []:
                 if not isinstance(n, dict):
                     continue
                 kept = []
                 for p in n.get("connections") or []:
                     if isinstance(p, list) and len(p) == 2 and str(p[0]) == ref:
-                        pin = str(p[1]).upper()
-                        if pin in ("A", "COM", "COMMON") or pin.startswith("A"):
-                            p = [ref, "A"]
-                        else:
-                            if seen_k:  # one cathode: keep the first cathode connection only
-                                continue
-                            seen_k.add(n.get("net"))
-                            p = [ref, "K"]
+                        name = by_key.get(str(p[1]).upper(), str(p[1]).upper())
+                        role = "A" if name.startswith("A") or name in ("COM", "COMMON") else \
+                            "K" if name.startswith(("K", "C")) or name.endswith("K") else None
+                        if role is None or seen[role]:
+                            continue  # one anode and one cathode only
+                        seen[role] = True
+                        p = [ref, role]
                     kept.append(p)
                 n["connections"] = kept
-            notes.append(f"{ref}: multi-colour LED ({lib}) replaced by a plain status LED (Device:LED)")
+            notes.append(f"{ref}: multi-LED package ({lib}) replaced by a plain status LED (Device:LED)")
         return notes
 
     def _move_indicator_pins(self, data, lib_of):
